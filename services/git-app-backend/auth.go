@@ -66,7 +66,7 @@ func (a *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirect := fmt.Sprintf("%s/dashboard?token=%s", a.cfg.FrontendURL, jwtToken)
+	redirect := fmt.Sprintf("%s/auth/workspace?token=%s", a.cfg.FrontendURL, jwtToken)
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
