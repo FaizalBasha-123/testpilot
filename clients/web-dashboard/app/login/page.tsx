@@ -1,6 +1,15 @@
+"use client";
+
 const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8001";
 
 export default function LoginPage() {
+  const handleLogin = () => {
+    window.location.href = '/auth/loading';
+    setTimeout(() => {
+      window.location.href = `${backend}/auth/login`;
+    }, 100);
+  };
+
   return (
     <main className="login-wrap">
       <section className="login-card">
@@ -14,9 +23,9 @@ export default function LoginPage() {
             repositories, and watch the AI agent open pull requests in seconds.
           </p>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <a className="button" href={`${backend}/auth/login`}>
+            <button className="button" onClick={handleLogin}>
               Login with GitHub
-            </a>
+            </button>
             <a className="button secondary" href="/">
               Back to Home
             </a>
