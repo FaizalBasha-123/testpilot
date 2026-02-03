@@ -55,8 +55,7 @@ export default function DashboardPage() {
         <div>
           <h2>Repository Activation</h2>
           <p className="muted">
-            Choose a repo and install the TestPilot GitHub App to enable
-            automated AI PRs.
+            Install the TestPilot GitHub App once, then select repos on GitHub.
           </p>
         </div>
         <a className="button secondary" href="/">
@@ -65,7 +64,17 @@ export default function DashboardPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 24 }}>
-        <strong>Status:</strong> {status}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div>
+            <strong>Status:</strong> {status}
+            <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
+              This opens GitHub’s official install screen.
+            </div>
+          </div>
+          <a className="button" href={installUrl} target="_blank">
+            Install GitHub App
+          </a>
+        </div>
       </div>
 
       <div className="grid">
@@ -77,9 +86,7 @@ export default function DashboardPage() {
                 {repo.private ? "Private" : "Public"}
               </div>
             </div>
-            <a className="button" href={installUrl} target="_blank">
-              Activate
-            </a>
+            <span className="badge">Install in GitHub</span>
           </div>
         ))}
       </div>
