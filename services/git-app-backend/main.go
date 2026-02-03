@@ -39,6 +39,8 @@ func main() {
 	app := &App{cfg: cfg, db: db, jwtKey: []byte(cfg.JWTSecret)}
 
 	mux := http.NewServeMux()
+	
+	// API routes
 	mux.HandleFunc("/auth/login", app.handleGitHubLogin)
 	mux.HandleFunc("/auth/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/webhooks/github", app.handleGitHubWebhook)
@@ -48,6 +50,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	
+	// Serve static frontend files
+	fs := http.FileServer(http.Dir("./static"))
+	mux.Handle("/", app.spaHandler("./static"))
 
 	server := &http.Server{
 		Addr:              ":8001",
@@ -96,6 +102,34 @@ func withCORS(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// spaHandler serves the Next.js static export as a SPA
+func (app *App) spaHandler(staticPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if path is an API or auth route
+		if r.URL.Path == "/auth/login" || 
+		   r.URL.Path == "/auth/callback" || 
+		   r.URL.Path == "/webhooks/github" || 
+		   r.URL.Path == "/health" ||
+		   len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
+			return
+		}
+		
+		// Serve static files
+		path := staticPath + r.URL.Path
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			// File doesn't exist, serve index.html (SPA routing)
+			http.ServeFile(w, r, staticPath+"/index.html")
+			return
+		}
+		http.FileServer(http.Dir(staticPath)).ServeHTTP(w, r)
+	}
+}
 			return
 		}
 		next.ServeHTTP(w, r)

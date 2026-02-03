@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 
-const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+// Use relative URL since frontend is served from same domain as backend
+const backend = '';
 
 type Repo = {
   id: number;

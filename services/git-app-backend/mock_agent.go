@@ -198,4 +198,3 @@ func mockPRBody(owner, repo string) string {
 func mockReviewBody(owner, repo string, number int) string {
 	return fmt.Sprintf("\n## \U0001F9EA TestPilot Review (Mock)\n\nAutomated review for **%s/%s** (PR #%d).\n\n### Highlights\n- \u2705 No blocking issues detected\n- \u26A0\uFE0F Suggested: add a brief performance note in the README\n- \u27A1\uFE0F Consider enabling caching for repeated queries\n\n> This is simulated output for hackathon demo purposes.\n", owner, repo, number)
 }
-
