@@ -13,7 +13,13 @@ export default function WorkspaceLoadingPage() {
     if (token) {
       localStorage.setItem("tp_token", token);
       const timer = setTimeout(() => {
-        window.location.href = "/onboarding";
+        // Check if wizard was completed
+        const wizardCompleted = localStorage.getItem("wizard_completed");
+        if (wizardCompleted) {
+          window.location.href = "/dashboard";
+        } else {
+          window.location.href = "/wizard";
+        }
       }, 1800);
       return () => clearTimeout(timer);
     }
