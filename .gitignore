@@ -10,8 +10,8 @@ coverage/
 clients/web-dashboard/.next/
 clients/web-dashboard/out/
 
-# Production build served by backend
-services/git-app-backend/static/
+# Production build served by backend (committed for Render deployment)
+# services/git-app-backend/static/
 
 # Misc
 .DS_Store
