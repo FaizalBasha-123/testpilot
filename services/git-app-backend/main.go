@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("/auth/login", app.handleGitHubLogin)
 	mux.HandleFunc("/auth/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/webhooks/github", app.handleGitHubWebhook)
+	mux.HandleFunc("/api/orgs", app.authMiddleware(app.handleListOrgs))
 	mux.HandleFunc("/api/repos", app.authMiddleware(app.handleListRepos))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -74,6 +74,11 @@ a {
   background: #0f172a;
 }
 
+.repo input[type="radio"] {
+  accent-color: #3b82f6;
+  transform: scale(1.1);
+}
+
 .badge {
   padding: 4px 8px;
   border-radius: 8px;

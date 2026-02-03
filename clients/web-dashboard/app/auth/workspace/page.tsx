@@ -13,7 +13,7 @@ export default function WorkspaceLoadingPage() {
     if (token) {
       localStorage.setItem("tp_token", token);
       const timer = setTimeout(() => {
-        window.location.href = "/dashboard";
+        window.location.href = "/onboarding";
       }, 1800);
       return () => clearTimeout(timer);
     }
@@ -52,7 +52,7 @@ export default function WorkspaceLoadingPage() {
             marginBottom: 32,
           }}
         >
-          Loading your workspace...
+          Setting up your workspace...
         </div>
         <div
           style={{
