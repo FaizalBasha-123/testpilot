@@ -29,6 +29,8 @@ func (a *App) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	switch e := event.(type) {
 	case *github.PushEvent:
 		a.handlePushEvent(w, e)
+	case *github.PullRequestEvent:
+		a.handlePullRequestEvent(w, e)
 	default:
 		w.WriteHeader(http.StatusNoContent)
 	}
@@ -51,6 +53,31 @@ func (a *App) handlePushEvent(w http.ResponseWriter, e *github.PushEvent) {
 	go func() {
 		if err := a.runMockAgent(owner, repo, installationID); err != nil {
 			fmt.Printf("mock agent error: %v\n", err)
+		}
+	}()
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (a *App) handlePullRequestEvent(w http.ResponseWriter, e *github.PullRequestEvent) {
+	action := e.GetAction()
+	if action != "opened" && action != "synchronize" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if e.Installation == nil {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	owner := e.GetRepo().GetOwner().GetLogin()
+	repo := e.GetRepo().GetName()
+	number := e.GetNumber()
+	installationID := e.Installation.GetID()
+
+	go func() {
+		if err := a.runMockReview(owner, repo, number, installationID); err != nil {
+			fmt.Printf("mock review error: %v\n", err)
 		}
 	}()
 
@@ -117,6 +144,21 @@ func (a *App) runMockAgent(owner, repo string, installationID int64) error {
 	return err
 }
 
+func (a *App) runMockReview(owner, repo string, number int, installationID int64) error {
+	client, err := a.newInstallationClient(installationID)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	body := mockReviewBody(owner, repo, number)
+	review := &github.PullRequestReviewRequest{
+		Body:  github.String(body),
+		Event: github.String("COMMENT"),
+	}
+	_, _, err = client.PullRequests.CreateReview(ctx, owner, repo, number, review)
+	return err
+}
+
 func (a *App) newInstallationClient(installationID int64) (*github.Client, error) {
 	key := []byte(strings.ReplaceAll(a.cfg.GitHubAppPrivateKey, "\\n", "\n"))
 	tr, err := ghinstallation.New(http.DefaultTransport, a.cfg.GitHubAppID, installationID, key)
@@ -151,5 +193,9 @@ func mockReportContent(owner, repo string) string {
 
 func mockPRBody(owner, repo string) string {
 	return fmt.Sprintf("\n## \U0001F916 AI Agent Summary (Mock)\n\nI analyzed **%s/%s** and found quick wins that can be safely automated.\n\n### \U0001F50D What Changed\n- Added `ai_optimization_report.md` with optimization highlights\n- Mocked performance analysis summary with JSON report\n\n### \U0001F9EA Estimated Impact (Simulated)\n- **Latency:** -18%%\n- **DB Load:** -22%%\n- **Cold Start:** -35%%\n\n### \u2705 Next Steps\n- Review the report\n- Merge if acceptable\n- Replace mock generator with real AI pipeline\n\n> This PR was generated instantly for hackathon demo purposes.\n", owner, repo)
+}
+
+func mockReviewBody(owner, repo string, number int) string {
+	return fmt.Sprintf("\n## \U0001F9EA TestPilot Review (Mock)\n\nAutomated review for **%s/%s** (PR #%d).\n\n### Highlights\n- \u2705 No blocking issues detected\n- \u26A0\uFE0F Suggested: add a brief performance note in the README\n- \u27A1\uFE0F Consider enabling caching for repeated queries\n\n> This is simulated output for hackathon demo purposes.\n", owner, repo, number)
 }
 
