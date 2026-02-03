@@ -140,9 +140,9 @@ func mockReportContent(owner, repo string) string {
 	buf.WriteString("# AI Optimization Report (Mock)\n\n")
 	buf.WriteString("**Generated:** " + time.Now().Format(time.RFC1123) + "\n\n")
 	buf.WriteString("## Highlights\n")
-	buf.WriteString("- \ud83d\ude80 Hot path micro-optimizations\n")
-	buf.WriteString("- \ud83e\udde0 Smarter batching and caching\n")
-	buf.WriteString("- \u26a1 Lowered latency and CPU\n\n")
+	buf.WriteString("- \U0001F680 Hot path micro-optimizations\n")
+	buf.WriteString("- \U0001F9E0 Smarter batching and caching\n")
+	buf.WriteString("- \u26A1 Lowered latency and CPU\n\n")
 	buf.WriteString("## Summary (JSON)\n")
 	buf.WriteString("```json\n" + string(b) + "\n```\n")
 	buf.WriteString("\n> This is demo content. Replace with real AI output later.\n")
@@ -150,6 +150,6 @@ func mockReportContent(owner, repo string) string {
 }
 
 func mockPRBody(owner, repo string) string {
-	return fmt.Sprintf("\n## \ud83e\udd16 AI Agent Summary (Mock)\n\nI analyzed **%s/%s** and found quick wins that can be safely automated.\n\n### \ud83d\udd0d What Changed\n- Added `ai_optimization_report.md` with optimization highlights\n- Mocked performance analysis summary with JSON report\n\n### \ud83e\udd6a Estimated Impact (Simulated)\n- **Latency:** -18%%\n- **DB Load:** -22%%\n- **Cold Start:** -35%%\n\n### \u2705 Next Steps\n- Review the report\n- Merge if acceptable\n- Replace mock generator with real AI pipeline\n\n> This PR was generated instantly for hackathon demo purposes.\n", owner, repo)
+	return fmt.Sprintf("\n## \U0001F916 AI Agent Summary (Mock)\n\nI analyzed **%s/%s** and found quick wins that can be safely automated.\n\n### \U0001F50D What Changed\n- Added `ai_optimization_report.md` with optimization highlights\n- Mocked performance analysis summary with JSON report\n\n### \U0001F9EA Estimated Impact (Simulated)\n- **Latency:** -18%%\n- **DB Load:** -22%%\n- **Cold Start:** -35%%\n\n### \u2705 Next Steps\n- Review the report\n- Merge if acceptable\n- Replace mock generator with real AI pipeline\n\n> This PR was generated instantly for hackathon demo purposes.\n", owner, repo)
 }
 
