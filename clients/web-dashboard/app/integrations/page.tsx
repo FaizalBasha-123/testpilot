@@ -1,12 +1,13 @@
 'use client';
 
 import Sidebar from '../components/Sidebar';
+import { Github, Mail, Link, Key, MessagesSquare, Hash } from 'lucide-react';
 
 export default function IntegrationsPage() {
   return (
     <div className="flex min-h-screen bg-[#0d1117]">
       <Sidebar />
-      
+
       <div className="flex-1 p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Integrations</h1>
@@ -14,10 +15,10 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-2xl">
-                🐙
+              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-white">
+                <Github size={28} />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold">GitHub</h3>
@@ -35,10 +36,10 @@ export default function IntegrationsPage() {
             </button>
           </div>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-2xl">
-                💬
+              <div className="w-12 h-12 bg-[#4A154B] rounded-lg flex items-center justify-center text-white">
+                <Hash size={28} />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold">Slack</h3>
@@ -53,10 +54,10 @@ export default function IntegrationsPage() {
             </button>
           </div>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-2xl">
-                📧
+              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                <Mail size={28} />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold">Email Notifications</h3>
@@ -74,10 +75,10 @@ export default function IntegrationsPage() {
             </button>
           </div>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-2xl">
-                🔔
+              <div className="w-12 h-12 bg-[#5865F2] rounded-lg flex items-center justify-center text-white">
+                <MessagesSquare size={28} />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold">Discord</h3>
@@ -92,10 +93,10 @@ export default function IntegrationsPage() {
             </button>
           </div>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-2xl">
-                🔗
+              <div className="w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center text-white">
+                <Link size={28} />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold">Webhooks</h3>
@@ -110,10 +111,10 @@ export default function IntegrationsPage() {
             </button>
           </div>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-[#24292f] rounded-lg flex items-center justify-center text-2xl">
-                🔧
+              <div className="w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center text-white">
+                <Key size={28} />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold">API Access</h3>

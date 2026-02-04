@@ -1,155 +1,147 @@
 'use client';
 
 import Sidebar from '../components/Sidebar';
+import { BookOpen, Github, Terminal, Puzzle } from 'lucide-react';
 
 export default function LearningsPage() {
   return (
     <div className="flex min-h-screen bg-[#0d1117]">
       <Sidebar />
-      
-      <div className="flex-1 p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Learnings & Insights</h1>
-          <p className="text-gray-400">Discover patterns and improve code quality based on AI-powered analysis.</p>
-        </div>
 
-        <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-lg p-6 mb-8">
-          <div className="flex items-start space-x-4">
-            <div className="text-4xl">🎓</div>
-            <div className="flex-1">
-              <h3 className="text-xl font-semibold text-white mb-2">Your Team's Progress</h3>
-              <p className="text-gray-300 mb-4">Based on 47 code reviews this week, here are the key insights TestPilot has discovered.</p>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-[#0d1117]/50 rounded-lg p-4">
-                  <p className="text-2xl font-bold text-white mb-1">85%</p>
-                  <p className="text-sm text-gray-400">Code Quality Score</p>
-                </div>
-                <div className="bg-[#0d1117]/50 rounded-lg p-4">
-                  <p className="text-2xl font-bold text-white mb-1">23</p>
-                  <p className="text-sm text-gray-400">Issues Prevented</p>
-                </div>
-                <div className="bg-[#0d1117]/50 rounded-lg p-4">
-                  <p className="text-2xl font-bold text-white mb-1">+12%</p>
-                  <p className="text-sm text-gray-400">Improvement</p>
+      <div className="flex-1 p-8 overflow-y-auto">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">Documentation</h1>
+            <p className="text-gray-400">Get started with TestPilot and integrate it into your workflow.</p>
+          </div>
+
+          <div className="space-y-8">
+            {/* Installation Section */}
+            <section className="bg-[#161b22] border border-gray-800 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-800 flex items-center space-x-3">
+                <Github className="text-white" size={24} />
+                <h2 className="text-xl font-semibold text-white">Installing the GitHub App</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-gray-300">
+                  To start using TestPilot, you need to install our GitHub App on your repositories.
+                  This allows TestPilot to monitor pull requests and provide automated feedback.
+                </p>
+                <ol className="list-decimal list-inside space-y-2 text-gray-400 ml-2">
+                  <li>Navigate to the <span className="text-blue-400">Repositories</span> tab in the dashboard.</li>
+                  <li>Click on <span className="text-white font-medium">"Install GitHub App"</span>.</li>
+                  <li>Select the organization or personal account where you want to install TestPilot.</li>
+                  <li>Choose to install on <span className="font-medium">All repositories</span> or <span className="font-medium">Selected repositories</span>.</li>
+                  <li>Click <span className="font-medium">Install</span> to confirm.</li>
+                </ol>
+                <div className="mt-4 p-4 bg-[#0d1117] rounded border border-gray-700">
+                  <p className="text-xs text-gray-500 uppercase mb-2">Note</p>
+                  <p className="text-sm text-gray-300">
+                    TestPilot requires <strong>Read</strong> access to code and <strong>Read & Write</strong> access to pull requests to function correctly.
+                  </p>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-              <span className="mr-2">🔥</span> Common Patterns
-            </h2>
-            <div className="space-y-4">
-              {[
-                { 
-                  pattern: 'Unhandled Promise Rejections',
-                  occurrences: 12,
-                  trend: 'down',
-                  description: 'Always add .catch() or try-catch blocks'
-                },
-                {
-                  pattern: 'Missing Input Validation',
-                  occurrences: 8,
-                  trend: 'up',
-                  description: 'Validate user inputs before processing'
-                },
-                {
-                  pattern: 'Inefficient Database Queries',
-                  occurrences: 5,
-                  trend: 'down',
-                  description: 'Use indexes and optimize JOIN operations'
-                },
-              ].map((item, idx) => (
-                <div key={idx} className="bg-[#0d1117] rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-white font-medium">{item.pattern}</h4>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400 text-sm">{item.occurrences}</span>
-                      <span className={item.trend === 'down' ? 'text-green-400' : 'text-red-400'}>
-                        {item.trend === 'down' ? '↓' : '↑'}
-                      </span>
+            {/* Usage in PRs */}
+            <section className="bg-[#161b22] border border-gray-800 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-800 flex items-center space-x-3">
+                <BookOpen className="text-white" size={24} />
+                <h2 className="text-xl font-semibold text-white">Using TestPilot in Pull Requests</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-gray-300">
+                  Once installed, TestPilot automatically runs on every new Pull Request and subsequent commits.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mr-4 mt-1">1</div>
+                    <div>
+                      <h4 className="text-white font-medium">Create a Pull Request</h4>
+                      <p className="text-sm text-gray-400 mt-1">Open a new PR in any enabled repository.</p>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-400">{item.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-              <span className="mr-2">💡</span> Recommended Best Practices
-            </h2>
-            <div className="space-y-4">
-              {[
-                {
-                  title: 'Error Handling',
-                  impact: 'high',
-                  description: 'Implement comprehensive error boundaries and logging'
-                },
-                {
-                  title: 'Code Documentation',
-                  impact: 'medium',
-                  description: 'Add JSDoc comments to exported functions'
-                },
-                {
-                  title: 'Type Safety',
-                  impact: 'high',
-                  description: 'Use TypeScript strict mode for better type checking'
-                },
-                {
-                  title: 'Test Coverage',
-                  impact: 'medium',
-                  description: 'Aim for >80% test coverage on critical paths'
-                },
-              ].map((practice, idx) => (
-                <div key={idx} className="bg-[#0d1117] rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-white font-medium">{practice.title}</h4>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      practice.impact === 'high' 
-                        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                        : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                    }`}>
-                      {practice.impact} impact
-                    </span>
+                  <div className="flex items-start">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mr-4 mt-1">2</div>
+                    <div>
+                      <h4 className="text-white font-medium">Wait for Analysis</h4>
+                      <p className="text-sm text-gray-400 mt-1">TestPilot will comment "👀 Reviewing..." and start analyzing your changes.</p>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-400">{practice.description}</p>
+                  <div className="flex items-start">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mr-4 mt-1">3</div>
+                    <div>
+                      <h4 className="text-white font-medium">Review Feedback</h4>
+                      <p className="text-sm text-gray-400 mt-1">Within seconds, you'll receive a detailed review summary and inline comments on specific lines of code.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mr-4 mt-1">4</div>
+                    <div>
+                      <h4 className="text-white font-medium">Interact with the Bot</h4>
+                      <p className="text-sm text-gray-400 mt-1">Reply to any comment with <code className="bg-gray-800 px-1 py-0.5 rounded">/fix</code> to have TestPilot generate a code fix for you.</p>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              </div>
+            </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <div className="text-3xl mb-3">📚</div>
-            <h3 className="text-lg font-semibold text-white mb-2">Learning Resources</h3>
-            <p className="text-sm text-gray-400 mb-4">Curated articles and tutorials based on your code patterns</p>
-            <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm transition-colors w-full">
-              View Resources
-            </button>
-          </div>
+            {/* VS Code Extension */}
+            <section className="bg-[#161b22] border border-gray-800 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-800 flex items-center space-x-3">
+                <Terminal className="text-white" size={24} />
+                <h2 className="text-xl font-semibold text-white">VS Code Extension Setup</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-gray-300">
+                  Get TestPilot feedback directly in your editor before you even push your code.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-[#0d1117] p-4 rounded border border-gray-700">
+                    <h4 className="text-white font-medium mb-2">1. Install Extension</h4>
+                    <p className="text-sm text-gray-400">Search for <strong>"TestPilot AI"</strong> in the VS Code Marketplace and click Install.</p>
+                  </div>
+                  <div className="bg-[#0d1117] p-4 rounded border border-gray-700">
+                    <h4 className="text-white font-medium mb-2">2. Authenticate</h4>
+                    <p className="text-sm text-gray-400">Run <code className="bg-gray-800 px-1 py-0.5 rounded">TestPilot: Sign In</code> in the Command Palette (Ctrl+Shift+P) to link your account.</p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-white font-medium mb-2">Key Features</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-400 text-sm ml-2">
+                    <li>Real-time code analysis as you type</li>
+                    <li>One-click fix suggestions</li>
+                    <li>Chat with TestPilot about your codebase</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <div className="text-3xl mb-3">🏆</div>
-            <h3 className="text-lg font-semibold text-white mb-2">Team Achievements</h3>
-            <p className="text-sm text-gray-400 mb-4">Celebrate milestones and track progress</p>
-            <button className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm transition-colors w-full">
-              View Achievements
-            </button>
-          </div>
+            {/* Enterprise Features */}
+            <section className="bg-[#161b22] border border-gray-800 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-800 flex items-center space-x-3">
+                <Puzzle className="text-white" size={24} />
+                <h2 className="text-xl font-semibold text-white">Enterprise Configuration</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-gray-300">
+                  For large teams, TestPilot offers advanced configuration options via a <code className="bg-gray-800 px-1 py-0.5 rounded">.testpilot.yaml</code> file in the root of your repository.
+                </p>
+                <pre className="bg-[#0d1117] p-4 rounded border border-gray-700 overflow-x-auto text-sm text-gray-300 font-mono">
+                  {`version: 1.0
+rules:
+  - id: security-check
+    level: error
+  - id: code-style
+    level: warning
+ignore:
+  - "**/*.test.ts"
+  - "dist/**"`}
+                </pre>
+              </div>
+            </section>
 
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <div className="text-3xl mb-3">📊</div>
-            <h3 className="text-lg font-semibold text-white mb-2">Code Quality Trends</h3>
-            <p className="text-sm text-gray-400 mb-4">Visualize your improvement over time</p>
-            <button className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-md text-sm transition-colors w-full">
-              View Trends
-            </button>
           </div>
         </div>
       </div>

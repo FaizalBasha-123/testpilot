@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useRouter } from 'next/navigation';
+import { User, CreditCard, Bell, ShieldAlert } from 'lucide-react';
 
 export default function AccountPage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function AccountPage() {
   return (
     <div className="flex min-h-screen bg-[#0d1117]">
       <Sidebar />
-      
+
       <div className="flex-1 p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Account Settings</h1>
@@ -26,8 +27,11 @@ export default function AccountPage() {
 
         <div className="space-y-6 max-w-3xl">
           <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Profile Information</h2>
-            
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
+              <User size={20} className="mr-2" />
+              Profile Information
+            </h2>
+
             <div className="space-y-6">
               <div className="flex items-center space-x-4 mb-6">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-semibold">
@@ -91,7 +95,10 @@ export default function AccountPage() {
           </div>
 
           <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Subscription</h2>
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
+              <CreditCard size={20} className="mr-2" />
+              Subscription
+            </h2>
             <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg mb-4">
               <div>
                 <h3 className="text-white font-semibold mb-1">Pro Plan</h3>
@@ -113,7 +120,10 @@ export default function AccountPage() {
           </div>
 
           <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Notification Preferences</h2>
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
+              <Bell size={20} className="mr-2" />
+              Notification Preferences
+            </h2>
             <div className="space-y-4">
               {[
                 { label: 'Review Completed', desc: 'When TestPilot finishes reviewing a PR', checked: true },
@@ -133,14 +143,17 @@ export default function AccountPage() {
           </div>
 
           <div className="bg-[#161b22] border border-red-500/20 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-red-400 mb-4">Danger Zone</h2>
+            <h2 className="text-xl font-semibold text-red-400 mb-4 flex items-center">
+              <ShieldAlert size={20} className="mr-2" />
+              Danger Zone
+            </h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-[#0d1117] rounded-lg">
                 <div>
                   <h4 className="text-white font-medium mb-1">Sign Out</h4>
                   <p className="text-sm text-gray-400">Sign out from your current session</p>
                 </div>
-                <button 
+                <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-md hover:bg-yellow-500/20 transition-colors"
                 >

@@ -41,7 +41,7 @@ func main() {
 
 	staticDir := resolveStaticDir()
 	mux := http.NewServeMux()
-	
+
 	// API routes (these take precedence over catch-all)
 	mux.HandleFunc("/auth/login", app.handleGitHubLogin)
 	mux.HandleFunc("/auth/callback", app.handleGitHubCallback)
@@ -52,7 +52,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	
+
 	// Serve static frontend files (catch-all must be last)
 	mux.HandleFunc("/", app.spaHandler(staticDir))
 
@@ -135,7 +135,7 @@ func resolveStaticDir() string {
 // spaHandler serves the Next.js static export as a SPA
 func (app *App) spaHandler(staticPath string) http.HandlerFunc {
 	fileServer := http.FileServer(http.Dir(staticPath))
-	
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Serve static files directly (CSS, JS, images, _next assets)
 		path := staticPath + r.URL.Path
@@ -153,7 +153,7 @@ func (app *App) spaHandler(staticPath string) http.HandlerFunc {
 				return
 			}
 		}
-		
+
 		// File doesn't exist, serve root index.html for SPA routing
 		http.ServeFile(w, r, staticPath+"/index.html")
 	}

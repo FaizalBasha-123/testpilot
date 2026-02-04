@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
+import { Search, Bug, Clock, AlertTriangle, AlertCircle, Info, TrendingUp } from 'lucide-react';
 
 export default function ReportsPage() {
   const [timeRange, setTimeRange] = useState('7d');
@@ -9,14 +10,14 @@ export default function ReportsPage() {
   return (
     <div className="flex min-h-screen bg-[#0d1117]">
       <Sidebar />
-      
+
       <div className="flex-1 p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Reports & Analytics</h1>
             <p className="text-gray-400">Track your code quality metrics and team performance.</p>
           </div>
-          <select 
+          <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
             className="px-4 py-2 bg-[#161b22] border border-gray-700 text-white rounded-md focus:outline-none focus:border-blue-500"
@@ -32,16 +33,23 @@ export default function ReportsPage() {
           <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-400 text-sm">Code Reviews</span>
-              <span className="text-2xl">🔍</span>
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Search size={20} className="text-blue-400" />
+              </div>
             </div>
             <p className="text-4xl font-bold text-white mb-1">47</p>
-            <p className="text-xs text-green-400">+12% from last period</p>
+            <p className="text-xs text-green-400 flex items-center">
+              <TrendingUp size={12} className="mr-1" />
+              +12% from last period
+            </p>
           </div>
 
           <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-400 text-sm">Issues Detected</span>
-              <span className="text-2xl">🐛</span>
+              <div className="p-2 bg-yellow-500/10 rounded-lg">
+                <Bug size={20} className="text-yellow-400" />
+              </div>
             </div>
             <p className="text-4xl font-bold text-white mb-1">23</p>
             <p className="text-xs text-yellow-400">3 critical, 20 minor</p>
@@ -50,7 +58,9 @@ export default function ReportsPage() {
           <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-400 text-sm">Time Saved</span>
-              <span className="text-2xl">⏱️</span>
+              <div className="p-2 bg-green-500/10 rounded-lg">
+                <Clock size={20} className="text-green-400" />
+              </div>
             </div>
             <p className="text-4xl font-bold text-white mb-1">18.5h</p>
             <p className="text-xs text-green-400">Developer hours</p>
@@ -68,13 +78,11 @@ export default function ReportsPage() {
                 { type: 'Best Practice Violation', count: 15, severity: 'info' },
                 { type: 'Code Duplication', count: 7, severity: 'info' },
               ].map((issue, idx) => (
-                <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-700 last:border-0">
+                <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-700 last:border-0 hover:bg-[#0d1117]/50 rounded px-2 transition-colors -mx-2">
                   <div className="flex items-center space-x-3">
-                    <span className={`w-2 h-2 rounded-full ${
-                      issue.severity === 'critical' ? 'bg-red-500' :
-                      issue.severity === 'warning' ? 'bg-yellow-500' :
-                      'bg-blue-500'
-                    }`}></span>
+                    {issue.severity === 'critical' && <AlertCircle size={16} className="text-red-500" />}
+                    {issue.severity === 'warning' && <AlertTriangle size={16} className="text-yellow-500" />}
+                    {issue.severity === 'info' && <Info size={16} className="text-blue-500" />}
                     <span className="text-white text-sm">{issue.type}</span>
                   </div>
                   <span className="text-gray-400 text-sm font-medium">{issue.count}</span>
@@ -98,13 +106,12 @@ export default function ReportsPage() {
                     <span className="text-sm text-gray-400">{repo.reviews} reviews</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <div className="flex-1 bg-[#0d1117] rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          repo.score >= 90 ? 'bg-green-500' :
-                          repo.score >= 80 ? 'bg-blue-500' :
-                          'bg-yellow-500'
-                        }`}
+                    <div className="flex-1 bg-[#0d1117] rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full ${repo.score >= 90 ? 'bg-green-500' :
+                            repo.score >= 80 ? 'bg-blue-500' :
+                              'bg-yellow-500'
+                          }`}
                         style={{ width: `${repo.score}%` }}
                       ></div>
                     </div>
@@ -120,9 +127,11 @@ export default function ReportsPage() {
           <h2 className="text-xl font-semibold text-white mb-4">Review Timeline</h2>
           <div className="h-64 flex items-end justify-between space-x-2">
             {[45, 62, 38, 71, 55, 82, 67, 49, 73, 58, 85, 71, 64, 77].map((height, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center">
-                <div className="w-full bg-gradient-to-t from-blue-500 to-purple-500 rounded-t" style={{ height: `${height}%` }}></div>
-                <span className="text-xs text-gray-500 mt-2">{idx + 1}</span>
+              <div key={idx} className="flex-1 flex flex-col items-center group">
+                <div
+                  className="w-full bg-gradient-to-t from-blue-500 to-purple-500 rounded-t opacity-80 group-hover:opacity-100 transition-opacity"
+                  style={{ height: `${height}%` }}
+                ></div>
               </div>
             ))}
           </div>
