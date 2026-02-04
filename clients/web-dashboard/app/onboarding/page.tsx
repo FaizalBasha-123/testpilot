@@ -46,8 +46,8 @@ export default function OnboardingPage() {
   }, [token]);
 
   const installLink = () => {
-    if (!data?.install_url || !selected) return "#";
-    const url = new URL(data.install_url);
+    if (!selected) return "#";
+    const url = new URL(`${backend}/auth/install`);
     url.searchParams.set("target_id", String(selected));
     return url.toString();
   };

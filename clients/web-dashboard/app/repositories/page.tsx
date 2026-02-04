@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Box, ExternalLink, Lock, Globe, CheckCircle } from 'lucide-react';
 
-const backend = '';
+const backend = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 type Repo = {
   id: number;
@@ -16,7 +16,7 @@ type Repo = {
 
 export default function RepositoriesPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [installUrl, setInstallUrl] = useState<string>('#');
+  const [installUrl, setInstallUrl] = useState<string>(`${backend}/auth/install`);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function RepositoriesPage() {
       .then((res) => res.json())
       .then((data) => {
         setRepos(data.repos || []);
-        setInstallUrl(data.install_url || '#');
+        setInstallUrl(`${backend}/auth/install`);
         setLoading(false);
       })
       .catch(() => setLoading(false));

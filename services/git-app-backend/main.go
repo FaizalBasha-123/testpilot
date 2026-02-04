@@ -44,6 +44,7 @@ func main() {
 
 	// API routes (these take precedence over catch-all)
 	mux.HandleFunc("/auth/login", app.handleGitHubLogin)
+	mux.HandleFunc("/auth/install", app.handleGitHubInstallStart)
 	mux.HandleFunc("/auth/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/webhooks/github", app.handleGitHubWebhook)
 	mux.HandleFunc("/api/orgs", app.authMiddleware(app.handleListOrgs))

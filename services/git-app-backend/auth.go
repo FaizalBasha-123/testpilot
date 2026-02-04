@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -69,6 +71,43 @@ func (a *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	// Redirect to the same domain (Render backend serves frontend)
 	redirect := fmt.Sprintf("%s/auth/workspace?token=%s", a.cfg.BackendURL, jwtToken)
 	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+func (a *App) handleGitHubInstallStart(w http.ResponseWriter, r *http.Request) {
+	installURL := strings.TrimSpace(a.cfg.GitHubAppInstallURL)
+	if installURL == "" {
+		http.Error(w, "missing install url", http.StatusInternalServerError)
+		return
+	}
+
+	state, err := randomState()
+	if err != nil {
+		http.Error(w, "state error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   300,
+	})
+
+	parsed, err := url.Parse(installURL)
+	if err != nil {
+		http.Error(w, "invalid install url", http.StatusInternalServerError)
+		return
+	}
+
+	query := parsed.Query()
+	query.Set("state", state)
+	if targetID := r.URL.Query().Get("target_id"); targetID != "" {
+		query.Set("target_id", targetID)
+	}
+	parsed.RawQuery = query.Encode()
+
+	http.Redirect(w, r, parsed.String(), http.StatusFound)
 }
 
 func (a *App) issueJWT(userID int64) (string, error) {
