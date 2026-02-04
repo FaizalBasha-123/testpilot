@@ -1,0 +1,36 @@
+
+> web-dashboard@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 2.4s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/15) ...
+  Generating static pages using 15 workers (3/15) 
+  Generating static pages using 15 workers (7/15) 
+  Generating static pages using 15 workers (11/15) 
+Ô£ô Generating static pages using 15 workers (15/15) in 345.6ms
+  Finalizing page optimization ...
+
+Route (app)
+Ôöî Ôùï /
+Ôö£ Ôùï /_not-found
+Ôö£ Ôùï /account
+Ôö£ Ôùï /auth/loading
+Ôö£ Ôùï /auth/workspace
+Ôö£ Ôùï /dashboard
+Ôö£ Ôùï /integrations
+Ôö£ Ôùï /learnings
+Ôö£ Ôùï /login
+Ôö£ Ôùï /onboarding
+Ôö£ Ôùï /reports
+Ôö£ Ôùï /repositories
+Ôö£ Ôùï /settings
+Ôöö Ôùï /wizard
+
+
+Ôùï  (Static)  prerendered as static content
+
