@@ -40,7 +40,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	
-	// API routes
+	// API routes (these take precedence over catch-all)
 	mux.HandleFunc("/auth/login", app.handleGitHubLogin)
 	mux.HandleFunc("/auth/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/webhooks/github", app.handleGitHubWebhook)
@@ -51,8 +51,8 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 	
-	// Serve static frontend files
-	mux.Handle("/", app.spaHandler("./static"))
+	// Serve static frontend files (catch-all must be last)
+	mux.HandleFunc("/", app.spaHandler("./static"))
 
 	server := &http.Server{
 		Addr:              ":8001",
@@ -109,24 +109,27 @@ func withCORS(next http.Handler) http.Handler {
 
 // spaHandler serves the Next.js static export as a SPA
 func (app *App) spaHandler(staticPath string) http.HandlerFunc {
+	fileServer := http.FileServer(http.Dir(staticPath))
+	
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if path is an API or auth route
-		if r.URL.Path == "/auth/login" || 
-		   r.URL.Path == "/auth/callback" || 
-		   r.URL.Path == "/webhooks/github" || 
-		   r.URL.Path == "/health" ||
-		   len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
-			http.NotFound(w, r)
-			return
+		// Serve static files directly (CSS, JS, images, _next assets)
+		path := staticPath + r.URL.Path
+		if info, err := os.Stat(path); err == nil {
+			// File exists
+			if !info.IsDir() {
+				// It's a file, serve it
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+			// It's a directory, check for index.html
+			indexPath := path + "/index.html"
+			if _, err := os.Stat(indexPath); err == nil {
+				http.ServeFile(w, r, indexPath)
+				return
+			}
 		}
 		
-		// Serve static files
-		path := staticPath + r.URL.Path
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			// File doesn't exist, serve index.html (SPA routing)
-			http.ServeFile(w, r, staticPath+"/index.html")
-			return
-		}
-		http.FileServer(http.Dir(staticPath)).ServeHTTP(w, r)
+		// File doesn't exist, serve root index.html for SPA routing
+		http.ServeFile(w, r, staticPath+"/index.html")
 	}
 }
