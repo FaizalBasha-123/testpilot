@@ -52,7 +52,6 @@ func main() {
 	})
 	
 	// Serve static frontend files
-	fs := http.FileServer(http.Dir("./static"))
 	mux.Handle("/", app.spaHandler("./static"))
 
 	server := &http.Server{
@@ -117,6 +116,7 @@ func (app *App) spaHandler(staticPath string) http.HandlerFunc {
 		   r.URL.Path == "/webhooks/github" || 
 		   r.URL.Path == "/health" ||
 		   len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
+			http.NotFound(w, r)
 			return
 		}
 		
@@ -129,9 +129,4 @@ func (app *App) spaHandler(staticPath string) http.HandlerFunc {
 		}
 		http.FileServer(http.Dir(staticPath)).ServeHTTP(w, r)
 	}
-}
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
