@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -38,6 +39,7 @@ func main() {
 
 	app := &App{cfg: cfg, db: db, jwtKey: []byte(cfg.JWTSecret)}
 
+	staticDir := resolveStaticDir()
 	mux := http.NewServeMux()
 	
 	// API routes (these take precedence over catch-all)
@@ -52,7 +54,7 @@ func main() {
 	})
 	
 	// Serve static frontend files (catch-all must be last)
-	mux.HandleFunc("/", app.spaHandler("./static"))
+	mux.HandleFunc("/", app.spaHandler(staticDir))
 
 	server := &http.Server{
 		Addr:              ":8001",
@@ -105,6 +107,29 @@ func withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func resolveStaticDir() string {
+	// Try relative to executable location first
+	exePath, err := os.Executable()
+	if err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidate := filepath.Join(exeDir, "static")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	// Fallbacks for different working directories
+	if _, err := os.Stat("./static"); err == nil {
+		return "./static"
+	}
+	if _, err := os.Stat("./services/git-app-backend/static"); err == nil {
+		return "./services/git-app-backend/static"
+	}
+
+	// Default to ./static even if missing (will surface 404s)
+	return "./static"
 }
 
 // spaHandler serves the Next.js static export as a SPA
