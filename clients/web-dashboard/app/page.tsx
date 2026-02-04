@@ -4,7 +4,11 @@ import { ArrowRight, CheckCircle, Code, Shield, Zap, Terminal, Github, GitBranch
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8001";
+const backend =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://testpilot-64v5.onrender.com'
+    : 'http://localhost:8001');
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);

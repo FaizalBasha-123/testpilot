@@ -1,11 +1,17 @@
 "use client";
 
+const backend =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://testpilot-64v5.onrender.com'
+    : 'http://localhost:8001');
+
 export default function LoginPage() {
   const handleLogin = () => {
     window.location.href = '/auth/loading';
     setTimeout(() => {
       // Use relative path since frontend is served from same domain
-      window.location.href = '/auth/login';
+      window.location.href = `${backend}/auth/login`;
     }, 100);
   };
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -138,6 +139,15 @@ func (app *App) spaHandler(staticPath string) http.HandlerFunc {
 	fileServer := http.FileServer(http.Dir(staticPath))
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		frontendURL := strings.TrimRight(app.cfg.FrontendURL, "/")
+		if frontendURL != "" {
+			switch r.URL.Path {
+			case "/", "/login", "/auth/loading":
+				http.Redirect(w, r, frontendURL+r.URL.Path, http.StatusFound)
+				return
+			}
+		}
+
 		// Serve static files directly (CSS, JS, images, _next assets)
 		path := staticPath + r.URL.Path
 		if info, err := os.Stat(path); err == nil {
