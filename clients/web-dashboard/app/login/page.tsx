@@ -1,12 +1,11 @@
 "use client";
 
-const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8001";
-
 export default function LoginPage() {
   const handleLogin = () => {
     window.location.href = '/auth/loading';
     setTimeout(() => {
-      window.location.href = `${backend}/auth/login`;
+      // Use relative path since frontend is served from same domain
+      window.location.href = '/auth/login';
     }, 100);
   };
 
