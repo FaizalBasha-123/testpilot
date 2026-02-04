@@ -37,15 +37,35 @@ func (a *App) handleGitHubLogin(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 	code := r.URL.Query().Get("code")
+	
+	// Validate state parameter
+	if state == "" {
+		http.Error(w, "missing state parameter", http.StatusBadRequest)
+		return
+	}
+	
+	// Validate authorization code
+	if code == "" {
+		http.Error(w, "missing authorization code", http.StatusBadRequest)
+		return
+	}
+	
+	// Verify state matches stored cookie
 	stored, err := r.Cookie("oauth_state")
-	if err != nil || stored.Value != state {
-		http.Error(w, "invalid state", http.StatusUnauthorized)
+	if err != nil {
+		http.Error(w, "state cookie not found - possible CSRF attack", http.StatusUnauthorized)
+		return
+	}
+	
+	if stored.Value != state {
+		http.Error(w, "state mismatch - possible CSRF attack", http.StatusUnauthorized)
 		return
 	}
 
+	// Exchange code for access token
 	token, err := a.oauthConfig().Exchange(context.Background(), code)
 	if err != nil {
-		http.Error(w, "token exchange failed", http.StatusInternalServerError)
+		http.Error(w, "failed to exchange authorization code: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 
