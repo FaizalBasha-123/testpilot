@@ -1,21 +1,42 @@
-# TestPilot - Unified Domain Architecture
+# TestPilot - Multi-Domain Architecture with Smart Routing
 
 ## Architecture Overview
 
-TestPilot now serves both backend API and frontend UI from a **single domain** on Render:
+TestPilot uses a **distributed architecture** with intelligent routing:
 
-```
-https://testpilot-64v5.onrender.com
-```
+- **Frontend (Vercel)**: `https://testpilot-drab.vercel.app` - Landing, login, and main app
+- **Backend (Render)**: `https://testpilot-64v5.onrender.com` - API, webhooks, and OAuth callbacks
 
-Just like CodeRabbit's `app.coderabbit.ai`, everything runs on one domain for a seamless experience.
+Like modern SaaS applications, the frontend and backend are hosted separately for optimal performance and scalability, while maintaining seamless user experience through smart routing.
 
 ## User Flow
 
-1. **Login**: User visits `https://testpilot-64v5.onrender.com` → clicks "Sign in with GitHub"
-2. **OAuth**: Redirects to GitHub OAuth → approves → back to `/auth/callback`
-3. **Wizard**: First-time users see `/auth/workspace` → redirects to `/wizard` for onboarding
-4. **Dashboard**: After wizard completion → redirects to `/dashboard` with sidebar navigation
+1. **Landing Page**: User visits `https://testpilot-drab.vercel.app` (Vercel frontend)
+2. **Login**: Clicks "Sign in with GitHub" → redirects to `https://testpilot-64v5.onrender.com/auth/login`
+3. **OAuth State Handling**: Backend `/auth/install` endpoint mints state cookie before GitHub App install
+4. **GitHub OAuth**: Approves → GitHub redirects to `/auth/callback` (backend validates state)
+5. **Workspace Setup**: Backend redirects to `/auth/workspace?token=JWT` (Vercel frontend receives token)
+6. **Dashboard**: Frontend stores JWT in localStorage → navigates to dashboard with full functionality
+7. **GitHub App**: User installs TestPilot app on selected repositories
+
+## Smart Routing Strategy
+
+### Frontend Routes (Vercel)
+- `/` - Landing page
+- `/login` - Login page  
+- `/auth/loading` - OAuth loading state
+- `/auth/workspace` - Receives JWT token from backend
+- `/dashboard/*` - Main application (protected)
+
+### Backend Routes (Render)
+- `/auth/login` - Initiates GitHub OAuth flow
+- `/auth/install` - Mints state cookie for GitHub App installation
+- `/auth/callback` - GitHub OAuth callback (validates state)
+- `/api/repos` - List user repositories (requires JWT)
+- `/api/orgs` - List user organizations (requires JWT)
+- `/webhooks/github` - Receives GitHub App events
+- `/health` - Health check
+- `/` - Redirects landing/login to Vercel frontend
 
 ## Technical Stack
 
@@ -109,29 +130,38 @@ fetch('/api/repos', {
 })
 ```
 
-## Environment Variables (Render)
+## Environment Variables
 
+### Vercel (Frontend)
 ```env
-GITHUB_CLIENT_ID=your_client_id
-GITHUB_CLIENT_SECRET=your_client_secret
-GITHUB_OAUTH_REDIRECT=https://testpilot-64v5.onrender.com/auth/callback
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
-GITHUB_APP_ID=your_app_id
-GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----...
-GITHUB_APP_INSTALL_URL=https://github.com/apps/testpilot-ai-agent/installations/new
-JWT_SECRET=your_jwt_secret
-DATABASE_URL=postgresql://...
-BACKEND_URL=https://testpilot-64v5.onrender.com
-FRONTEND_URL=https://testpilot-64v5.onrender.com  # Same as BACKEND_URL
+NEXT_PUBLIC_BACKEND_URL=https://testpilot-64v5.onrender.com
+NODE_ENV=production
 ```
 
-## Benefits of Unified Domain
+### Render (Backend)
+```env
+GITHUB_CLIENT_ID=Iv23lifdp0Zkk7P72cfn
+GITHUB_CLIENT_SECRET=e2c53eea72f69b8603f6384c3bc4ac4d30c76d3d
+GITHUB_OAUTH_REDIRECT=https://testpilot-64v5.onrender.com/auth/callback
+GITHUB_WEBHOOK_SECRET=FAIZAL_BASHA_S
+GITHUB_APP_ID=2785953
+GITHUB_APP_PRIVATE_KEY=SHA256:TwESPx1eQW0iHHVWR2+13gyQoH23qD3hBH/Lfg71VyI=
+GITHUB_APP_INSTALL_URL=https://github.com/apps/testpilot-ai-agent/installations/new
+JWT_SECRET=FAIZAL_BASHA_S
+DATABASE_URL=postgresql://neondb_owner:npg_BAkQHzx9Ko2t@ep-spring-heart-a1ukd2yb-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+BACKEND_URL=https://testpilot-64v5.onrender.com
+FRONTEND_URL=https://testpilot-drab.vercel.app
+```
 
-✅ **No CORS issues** - Frontend and backend on same origin  
-✅ **Simpler deployment** - One service instead of two  
-✅ **Faster navigation** - No cross-origin requests  
-✅ **Better UX** - Consistent domain like CodeRabbit  
-✅ **Easier authentication** - Tokens stay on same domain  
+## Benefits of Distributed Architecture
+
+✅ **Frontend Performance** - Vercel's global CDN for instant page loads  
+✅ **Backend Reliability** - Dedicated Go service for API and webhooks  
+✅ **Separate Scaling** - Scale frontend and backend independently  
+✅ **Smart Routing** - Automatic redirects handle domain transitions  
+✅ **OAuth Security** - State validation prevents CSRF attacks on App installation  
+✅ **Seamless UX** - Users never see domain switches in normal flow  
+✅ **Development Flexibility** - Develop frontend and backend independently  
 
 ## Development
 
@@ -142,51 +172,56 @@ FRONTEND_URL=https://testpilot-64v5.onrender.com  # Same as BACKEND_URL
 cd services/git-app-backend
 go run *.go
 # Runs on http://localhost:8001
+# BACKEND_URL=http://localhost:8001
+# FRONTEND_URL=http://localhost:3000
 ```
 
-**Terminal 2** - Frontend (for development):
+**Terminal 2** - Frontend:
 ```bash
 cd clients/web-dashboard
 npm run dev
 # Runs on http://localhost:3000
-# Uses NEXT_PUBLIC_BACKEND_URL=http://localhost:8001 for API calls
+# NEXT_PUBLIC_BACKEND_URL=http://localhost:8001 for API calls
 ```
 
-**Production** - Unified:
+### Production Build
+
 ```bash
-# Build frontend
+# Frontend (Vercel)
 cd clients/web-dashboard
 npm run build
+# Auto-deployed to https://testpilot-drab.vercel.app
 
-# Copy to backend
-cd ../..
-cp -r clients/web-dashboard/out services/git-app-backend/static
-
-# Run backend (serves both)
+# Backend (Render)
 cd services/git-app-backend
-go run *.go
-# Visit http://localhost:8001 for everything
+# Auto-deployed when main branch is pushed
 ```
 
 ## Next Steps
 
-1. ✅ Build frontend with `npm run build`
-2. ✅ Copy static files to backend
-3. ✅ Update auth redirect to use BACKEND_URL
-4. ✅ Commit static files to git
-5. ✅ Push to GitHub → Render auto-deploys
-6. ⏳ Visit `https://testpilot-64v5.onrender.com` to test!
+1. ✅ Deploy frontend to Vercel
+2. ✅ Deploy backend to Render with correct environment variables
+3. ✅ Configure GitHub OAuth with `GITHUB_OAUTH_REDIRECT` pointing to backend
+4. ✅ Install TestPilot GitHub App on test repositories
+5. ⏳ Test full OAuth flow: Landing → Login → OAuth → Dashboard
+6. ⏳ Create test PR to trigger mock_agent webhook
 
 ## Troubleshooting
 
 **Q: Frontend shows 404 errors?**  
-A: Make sure static files are in `services/git-app-backend/static/` and committed to git.
+A: Ensure NEXT_PUBLIC_BACKEND_URL is correctly set to Render backend URL.
 
-**Q: API calls fail?**  
-A: Check that backend routes in `main.go` are registered before the SPA handler.
+**Q: OAuth redirects fail?**  
+A: Verify `GITHUB_OAUTH_REDIRECT` environment variable matches the actual backend URL.
 
-**Q: Login redirects to wrong URL?**  
-A: Verify `GITHUB_OAUTH_REDIRECT` and `BACKEND_URL` match your Render domain.
+**Q: "Invalid state" error on GitHub App install?**  
+A: User must start from `/auth/install` endpoint to mint the state cookie before redirect.
 
-**Q: Static files not updating?**  
-A: Run `./deploy.sh` to rebuild and copy latest frontend changes.
+**Q: Tokens not persisting?**  
+A: Ensure browser allows localStorage access (not in private/incognito mode).
+
+**Q: Mock agent not creating PRs?**  
+A: Check that GITHUB_WEBHOOK_SECRET in backend matches GitHub App settings.
+
+**Q: API calls return 401 Unauthorized?**  
+A: Ensure JWT token is present in localStorage and has not expired.
