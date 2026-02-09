@@ -1,0 +1,5 @@
+1:"$Sreact.fragment"
+2:I[97367,["/_next/static/chunks/ff1a16fafef87110.js","/_next/static/chunks/d2be314c3ece3fbe.js"],"OutletBoundary"]
+3:"$Sreact.suspense"
+0:{"buildId":"fmC82hfJdgD0bFKj4f8Ha","rsc":["$","$1","c",{"children":[["$","main",null,{"className":"login-wrap","children":["$","section",null,{"style":{"textAlign":"center"},"children":[["$","div",null,{"className":"logo","style":{"fontSize":32,"justifyContent":"center","marginBottom":32},"children":[["$","span",null,{"className":"badge","style":{"fontSize":24,"width":56,"height":56,"display":"flex","alignItems":"center","justifyContent":"center"},"children":"TP"}],"TestPilot"]}],["$","div",null,{"style":{"fontSize":18,"color":"#94a3b8","marginTop":24},"children":"Signing you in..."}],["$","div",null,{"style":{"marginTop":24,"display":"flex","justifyContent":"center"},"children":["$","div",null,{"className":"spinner"}]}]]}]}],null,["$","$L2",null,{"children":["$","$3",null,{"name":"Next.MetadataOutlet","children":"$@4"}]}]]}],"loading":null,"isPartial":false}
+4:null

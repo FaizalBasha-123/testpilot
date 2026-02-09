@@ -1,0 +1,1367 @@
+[
+  {
+    "key": "ArrayTypeStyleCheck",
+    "name": "Array Type Style",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/arraytypestyle.html#ArrayTypeStyle"
+  },
+  {
+    "key": "AvoidEscapedUnicodeCharactersCheck",
+    "name": "Avoid Escaped Unicode Characters",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/avoidescapedunicodecharacters.html#AvoidEscapedUnicodeCharacters"
+  },
+  {
+    "key": "DescendantTokenCheck",
+    "name": "Descendant Token",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/descendanttoken.html#DescendantToken"
+  },
+  {
+    "key": "FinalParametersCheck",
+    "name": "Final Parameters",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/finalparameters.html#FinalParameters"
+  },
+  {
+    "key": "NewlineAtEndOfFileCheck",
+    "name": "Newline At End Of File",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/newlineatendoffile.html#NewlineAtEndOfFile"
+  },
+  {
+    "key": "NoCodeInFileCheck",
+    "name": "No Code In File",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/nocodeinfile.html#NoCodeInFile"
+  },
+  {
+    "key": "OrderedPropertiesCheck",
+    "name": "Ordered Properties",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/orderedproperties.html#OrderedProperties"
+  },
+  {
+    "key": "OuterTypeFilenameCheck",
+    "name": "Outer Type Filename",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/outertypefilename.html#OuterTypeFilename"
+  },
+  {
+    "key": "SuppressWarningsHolderCheck",
+    "name": "Suppress Warnings Holder",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/suppresswarningsholder.html#SuppressWarningsHolder"
+  },
+  {
+    "key": "TodoCommentCheck",
+    "name": "Todo Comment",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/todocomment.html#TodoComment"
+  },
+  {
+    "key": "TrailingCommentCheck",
+    "name": "Trailing Comment",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/trailingcomment.html#TrailingComment"
+  },
+  {
+    "key": "TranslationCheck",
+    "name": "Translation",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/translation.html#Translation"
+  },
+  {
+    "key": "UncommentedMainCheck",
+    "name": "Uncommented Main",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/uncommentedmain.html#UncommentedMain"
+  },
+  {
+    "key": "UniquePropertiesCheck",
+    "name": "Unique Properties",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/uniqueproperties.html#UniqueProperties"
+  },
+  {
+    "key": "UpperEllCheck",
+    "name": "Upper Ell",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/upperell.html#UpperEll"
+  },
+  {
+    "key": "annotation.AnnotationLocationCheck",
+    "name": "Annotation Location",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/annotationlocation.html#AnnotationLocation"
+  },
+  {
+    "key": "annotation.AnnotationOnSameLineCheck",
+    "name": "Annotation On Same Line",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/annotationonsameline.html#AnnotationOnSameLine"
+  },
+  {
+    "key": "annotation.AnnotationUseStyleCheck",
+    "name": "Annotation Use Style",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/annotationusestyle.html#AnnotationUseStyle"
+  },
+  {
+    "key": "annotation.MissingDeprecatedCheck",
+    "name": "Missing Deprecated",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/missingdeprecated.html#MissingDeprecated"
+  },
+  {
+    "key": "annotation.MissingOverrideCheck",
+    "name": "Missing Override",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/missingoverride.html#MissingOverride"
+  },
+  {
+    "key": "annotation.PackageAnnotationCheck",
+    "name": "Package Annotation",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/packageannotation.html#PackageAnnotation"
+  },
+  {
+    "key": "annotation.SuppressWarningsCheck",
+    "name": "Suppress Warnings",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/annotation/suppresswarnings.html#SuppressWarnings"
+  },
+  {
+    "key": "blocks.AvoidNestedBlocksCheck",
+    "name": "Avoid Nested Blocks",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/blocks/avoidnestedblocks.html#AvoidNestedBlocks"
+  },
+  {
+    "key": "blocks.EmptyBlockCheck",
+    "name": "Empty Block",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/blocks/emptyblock.html#EmptyBlock"
+  },
+  {
+    "key": "blocks.EmptyCatchBlockCheck",
+    "name": "Empty Catch Block",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/blocks/emptycatchblock.html#EmptyCatchBlock"
+  },
+  {
+    "key": "blocks.LeftCurlyCheck",
+    "name": "Left Curly",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/blocks/leftcurly.html#LeftCurly"
+  },
+  {
+    "key": "blocks.NeedBracesCheck",
+    "name": "Need Braces",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/blocks/needbraces.html#NeedBraces"
+  },
+  {
+    "key": "blocks.RightCurlyCheck",
+    "name": "Right Curly",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/blocks/rightcurly.html#RightCurly"
+  },
+  {
+    "key": "coding.ArrayTrailingCommaCheck",
+    "name": "Array Trailing Comma",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/arraytrailingcomma.html#ArrayTrailingComma"
+  },
+  {
+    "key": "coding.AvoidDoubleBraceInitializationCheck",
+    "name": "Avoid Double Brace Initialization",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/avoiddoublebraceinitialization.html#AvoidDoubleBraceInitialization"
+  },
+  {
+    "key": "coding.AvoidInlineConditionalsCheck",
+    "name": "Avoid Inline Conditionals",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/avoidinlineconditionals.html#AvoidInlineConditionals"
+  },
+  {
+    "key": "coding.AvoidNoArgumentSuperConstructorCallCheck",
+    "name": "Avoid No Argument Super Constructor Call",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/avoidnoargumentsuperconstructorcall.html#AvoidNoArgumentSuperConstructorCall"
+  },
+  {
+    "key": "coding.ConstructorsDeclarationGroupingCheck",
+    "name": "Constructors Declaration Grouping",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/constructorsdeclarationgrouping.html#ConstructorsDeclarationGrouping"
+  },
+  {
+    "key": "coding.CovariantEqualsCheck",
+    "name": "Covariant Equals",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/covariantequals.html#CovariantEquals"
+  },
+  {
+    "key": "coding.DeclarationOrderCheck",
+    "name": "Declaration Order",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/declarationorder.html#DeclarationOrder"
+  },
+  {
+    "key": "coding.DefaultComesLastCheck",
+    "name": "Default Comes Last",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/defaultcomeslast.html#DefaultComesLast"
+  },
+  {
+    "key": "coding.EmptyStatementCheck",
+    "name": "Empty Statement",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/emptystatement.html#EmptyStatement"
+  },
+  {
+    "key": "coding.EqualsAvoidNullCheck",
+    "name": "Equals Avoid Null",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/equalsavoidnull.html#EqualsAvoidNull"
+  },
+  {
+    "key": "coding.EqualsHashCodeCheck",
+    "name": "Equals Hash Code",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/equalshashcode.html#EqualsHashCode"
+  },
+  {
+    "key": "coding.ExplicitInitializationCheck",
+    "name": "Explicit Initialization",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/explicitinitialization.html#ExplicitInitialization"
+  },
+  {
+    "key": "coding.FallThroughCheck",
+    "name": "Fall Through",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/fallthrough.html#FallThrough"
+  },
+  {
+    "key": "coding.FinalLocalVariableCheck",
+    "name": "Final Local Variable",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/finallocalvariable.html#FinalLocalVariable"
+  },
+  {
+    "key": "coding.HiddenFieldCheck",
+    "name": "Hidden Field",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/hiddenfield.html#HiddenField"
+  },
+  {
+    "key": "coding.IllegalCatchCheck",
+    "name": "Illegal Catch",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/illegalcatch.html#IllegalCatch"
+  },
+  {
+    "key": "coding.IllegalInstantiationCheck",
+    "name": "Illegal Instantiation",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/illegalinstantiation.html#IllegalInstantiation"
+  },
+  {
+    "key": "coding.IllegalThrowsCheck",
+    "name": "Illegal Throws",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/illegalthrows.html#IllegalThrows"
+  },
+  {
+    "key": "coding.IllegalTokenCheck",
+    "name": "Illegal Token",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/illegaltoken.html#IllegalToken"
+  },
+  {
+    "key": "coding.IllegalTokenTextCheck",
+    "name": "Illegal Token Text",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/illegaltokentext.html#IllegalTokenText"
+  },
+  {
+    "key": "coding.IllegalTypeCheck",
+    "name": "Illegal Type",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/illegaltype.html#IllegalType"
+  },
+  {
+    "key": "coding.InnerAssignmentCheck",
+    "name": "Inner Assignment",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/innerassignment.html#InnerAssignment"
+  },
+  {
+    "key": "coding.MagicNumberCheck",
+    "name": "Magic Number",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/magicnumber.html#MagicNumber"
+  },
+  {
+    "key": "coding.MatchXpathCheck",
+    "name": "Match Xpath",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/matchxpath.html#MatchXpath"
+  },
+  {
+    "key": "coding.MissingCtorCheck",
+    "name": "Missing Constructor",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/missingctor.html#MissingCtor"
+  },
+  {
+    "key": "coding.MissingNullCaseInSwitchCheck",
+    "name": "Missing Null Case In Switch",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/missingnullcaseinswitch.html#MissingNullCaseInSwitch"
+  },
+  {
+    "key": "coding.MissingSwitchDefaultCheck",
+    "name": "Missing Switch Default",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/missingswitchdefault.html#MissingSwitchDefault"
+  },
+  {
+    "key": "coding.ModifiedControlVariableCheck",
+    "name": "Modified Control Variable",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/modifiedcontrolvariable.html#ModifiedControlVariable"
+  },
+  {
+    "key": "coding.MultipleStringLiteralsCheck",
+    "name": "Multiple String Literals",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/multiplestringliterals.html#MultipleStringLiterals"
+  },
+  {
+    "key": "coding.MultipleVariableDeclarationsCheck",
+    "name": "Multiple Variable Declarations",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/multiplevariabledeclarations.html#MultipleVariableDeclarations"
+  },
+  {
+    "key": "coding.NestedForDepthCheck",
+    "name": "Nested For Depth",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/nestedfordepth.html#NestedForDepth"
+  },
+  {
+    "key": "coding.NestedIfDepthCheck",
+    "name": "Nested If Depth",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/nestedifdepth.html#NestedIfDepth"
+  },
+  {
+    "key": "coding.NestedTryDepthCheck",
+    "name": "Nested Try Depth",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/nestedtrydepth.html#NestedTryDepth"
+  },
+  {
+    "key": "coding.NoArrayTrailingCommaCheck",
+    "name": "No Array Trailing Comma",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/noarraytrailingcomma.html#NoArrayTrailingComma"
+  },
+  {
+    "key": "coding.NoCloneCheck",
+    "name": "No Clone",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/noclone.html#NoClone"
+  },
+  {
+    "key": "coding.NoEnumTrailingCommaCheck",
+    "name": "No Enum Trailing Comma",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/noenumtrailingcomma.html#NoEnumTrailingComma"
+  },
+  {
+    "key": "coding.NoFinalizerCheck",
+    "name": "No Finalizer",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/nofinalizer.html#NoFinalizer"
+  },
+  {
+    "key": "coding.OneStatementPerLineCheck",
+    "name": "One Statement Per Line",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/onestatementperline.html#OneStatementPerLine"
+  },
+  {
+    "key": "coding.OverloadMethodsDeclarationOrderCheck",
+    "name": "Overload Methods Declaration Order",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/overloadmethodsdeclarationorder.html#OverloadMethodsDeclarationOrder"
+  },
+  {
+    "key": "coding.PackageDeclarationCheck",
+    "name": "Package Declaration",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/packagedeclaration.html#PackageDeclaration"
+  },
+  {
+    "key": "coding.ParameterAssignmentCheck",
+    "name": "Parameter Assignment",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/parameterassignment.html#ParameterAssignment"
+  },
+  {
+    "key": "coding.PatternVariableAssignmentCheck",
+    "name": "Pattern Variable Assignment",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/patternvariableassignment.html#PatternVariableAssignment"
+  },
+  {
+    "key": "coding.RequireThisCheck",
+    "name": "Require This",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/requirethis.html#RequireThis"
+  },
+  {
+    "key": "coding.ReturnCountCheck",
+    "name": "Return Count",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/returncount.html#ReturnCount"
+  },
+  {
+    "key": "coding.SimplifyBooleanExpressionCheck",
+    "name": "Simplify Boolean Expression",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/simplifybooleanexpression.html#SimplifyBooleanExpression"
+  },
+  {
+    "key": "coding.SimplifyBooleanReturnCheck",
+    "name": "Simplify Boolean Return",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/simplifybooleanreturn.html#SimplifyBooleanReturn"
+  },
+  {
+    "key": "coding.StringLiteralEqualityCheck",
+    "name": "String Literal Equality",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/stringliteralequality.html#StringLiteralEquality"
+  },
+  {
+    "key": "coding.SuperCloneCheck",
+    "name": "Super Clone",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/superclone.html#SuperClone"
+  },
+  {
+    "key": "coding.SuperFinalizeCheck",
+    "name": "Super Finalize",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/superfinalize.html#SuperFinalize"
+  },
+  {
+    "key": "coding.UnnecessaryNullCheckWithInstanceOfCheck",
+    "name": "Unnecessary Null Check With Instance Of",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unnecessarynullcheckwithinstanceof.html#UnnecessaryNullCheckWithInstanceOf"
+  },
+  {
+    "key": "coding.UnnecessaryParenthesesCheck",
+    "name": "Unnecessary Parentheses",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unnecessaryparentheses.html#UnnecessaryParentheses"
+  },
+  {
+    "key": "coding.UnnecessarySemicolonAfterOuterTypeDeclarationCheck",
+    "name": "Unnecessary Semicolon After Outer Type Declaration",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unnecessarysemicolonafteroutertypedeclaration.html#UnnecessarySemicolonAfterOuterTypeDeclaration"
+  },
+  {
+    "key": "coding.UnnecessarySemicolonAfterTypeMemberDeclarationCheck",
+    "name": "Unnecessary Semicolon After Type Member Declaration",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unnecessarysemicolonaftertypememberdeclaration.html#UnnecessarySemicolonAfterTypeMemberDeclaration"
+  },
+  {
+    "key": "coding.UnnecessarySemicolonInEnumerationCheck",
+    "name": "Unnecessary Semicolon In Enumeration",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unnecessarysemicoloninenumeration.html#UnnecessarySemicolonInEnumeration"
+  },
+  {
+    "key": "coding.UnnecessarySemicolonInTryWithResourcesCheck",
+    "name": "Unnecessary Semicolon In Try With Resources",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unnecessarysemicolonintrywithresources.html#UnnecessarySemicolonInTryWithResources"
+  },
+  {
+    "key": "coding.UnusedCatchParameterShouldBeUnnamedCheck",
+    "name": "Unused Catch Parameter Should Be Unnamed",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unusedcatchparametershouldbeunnamed.html#UnusedCatchParameterShouldBeUnnamed"
+  },
+  {
+    "key": "coding.UnusedLambdaParameterShouldBeUnnamedCheck",
+    "name": "Unused Lambda Parameter Should Be Unnamed",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unusedlambdaparametershouldbeunnamed.html#UnusedLambdaParameterShouldBeUnnamed"
+  },
+  {
+    "key": "coding.UnusedLocalVariableCheck",
+    "name": "Unused Local Variable",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/unusedlocalvariable.html#UnusedLocalVariable"
+  },
+  {
+    "key": "coding.VariableDeclarationUsageDistanceCheck",
+    "name": "Variable Declaration Usage Distance",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/variabledeclarationusagedistance.html#VariableDeclarationUsageDistance"
+  },
+  {
+    "key": "coding.WhenShouldBeUsedCheck",
+    "name": "When Should Be Used",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/coding/whenshouldbeused.html#WhenShouldBeUsed"
+  },
+  {
+    "key": "design.DesignForExtensionCheck",
+    "name": "Design For Extension",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/designforextension.html#DesignForExtension"
+  },
+  {
+    "key": "design.FinalClassCheck",
+    "name": "Final Class",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/finalclass.html#FinalClass"
+  },
+  {
+    "key": "design.HideUtilityClassConstructorCheck",
+    "name": "Hide Utility Class Constructor",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/hideutilityclassconstructor.html#HideUtilityClassConstructor"
+  },
+  {
+    "key": "design.InnerTypeLastCheck",
+    "name": "Inner Type Last",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/innertypelast.html#InnerTypeLast"
+  },
+  {
+    "key": "design.InterfaceIsTypeCheck",
+    "name": "Interface Is Type",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/interfaceistype.html#InterfaceIsType"
+  },
+  {
+    "key": "design.MutableExceptionCheck",
+    "name": "Mutable Exception",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/mutableexception.html#MutableException"
+  },
+  {
+    "key": "design.OneTopLevelClassCheck",
+    "name": "One Top Level Class",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/onetoplevelclass.html#OneTopLevelClass"
+  },
+  {
+    "key": "design.SealedShouldHavePermitsListCheck",
+    "name": "Sealed Should Have Permits List",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/sealedshouldhavepermitslist.html#SealedShouldHavePermitsList"
+  },
+  {
+    "key": "design.ThrowsCountCheck",
+    "name": "Throws Count",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/throwscount.html#ThrowsCount"
+  },
+  {
+    "key": "design.VisibilityModifierCheck",
+    "name": "Visibility Modifier",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/design/visibilitymodifier.html#VisibilityModifier"
+  },
+  {
+    "key": "header.HeaderCheck",
+    "name": "Header",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/header/header.html#Header"
+  },
+  {
+    "key": "header.MultiFileRegexpHeaderCheck",
+    "name": "Multi File Regexp Header",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/header/multifileregexpheader.html#MultiFileRegexpHeader"
+  },
+  {
+    "key": "header.RegexpHeaderCheck",
+    "name": "Regexp Header",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/header/regexpheader.html#RegexpHeader"
+  },
+  {
+    "key": "imports.AvoidStarImportCheck",
+    "name": "Avoid Star Import",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/avoidstarimport.html#AvoidStarImport"
+  },
+  {
+    "key": "imports.AvoidStaticImportCheck",
+    "name": "Avoid Static Import",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/avoidstaticimport.html#AvoidStaticImport"
+  },
+  {
+    "key": "imports.CustomImportOrderCheck",
+    "name": "Custom Import Order",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/customimportorder.html#CustomImportOrder"
+  },
+  {
+    "key": "imports.IllegalImportCheck",
+    "name": "Illegal Import",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/illegalimport.html#IllegalImport"
+  },
+  {
+    "key": "imports.ImportControlCheck",
+    "name": "Import Control",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/importcontrol.html#ImportControl"
+  },
+  {
+    "key": "imports.ImportOrderCheck",
+    "name": "Import Order",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/importorder.html#ImportOrder"
+  },
+  {
+    "key": "imports.RedundantImportCheck",
+    "name": "Redundant Import",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/redundantimport.html#RedundantImport"
+  },
+  {
+    "key": "imports.UnusedImportsCheck",
+    "name": "Unused Imports",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/imports/unusedimports.html#UnusedImports"
+  },
+  {
+    "key": "indentation.CommentsIndentationCheck",
+    "name": "Comments Indentation",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/commentsindentation.html#CommentsIndentation"
+  },
+  {
+    "key": "indentation.IndentationCheck",
+    "name": "Indentation",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/misc/indentation.html#Indentation"
+  },
+  {
+    "key": "javadoc.AtclauseOrderCheck",
+    "name": "At-clause Order",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/atclauseorder.html#AtclauseOrder"
+  },
+  {
+    "key": "javadoc.InvalidJavadocPositionCheck",
+    "name": "Invalid Javadoc Position",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/invalidjavadocposition.html#InvalidJavadocPosition"
+  },
+  {
+    "key": "javadoc.JavadocBlockTagLocationCheck",
+    "name": "Javadoc Block Tag Location",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocblocktaglocation.html#JavadocBlockTagLocation"
+  },
+  {
+    "key": "javadoc.JavadocContentLocationCheck",
+    "name": "Javadoc Content Location",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadoccontentlocation.html#JavadocContentLocation"
+  },
+  {
+    "key": "javadoc.JavadocLeadingAsteriskAlignCheck",
+    "name": "Javadoc Leading Asterisk Align",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocleadingasteriskalign.html#JavadocLeadingAsteriskAlign"
+  },
+  {
+    "key": "javadoc.JavadocMethodCheck",
+    "name": "Javadoc Method",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocmethod.html#JavadocMethod"
+  },
+  {
+    "key": "javadoc.JavadocMissingLeadingAsteriskCheck",
+    "name": "Javadoc Missing Leading Asterisk",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocmissingleadingasterisk.html#JavadocMissingLeadingAsterisk"
+  },
+  {
+    "key": "javadoc.JavadocMissingWhitespaceAfterAsteriskCheck",
+    "name": "Javadoc Missing Whitespace After Asterisk",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocmissingwhitespaceafterasterisk.html#JavadocMissingWhitespaceAfterAsterisk"
+  },
+  {
+    "key": "javadoc.JavadocPackageCheck",
+    "name": "Javadoc Package",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocpackage.html#JavadocPackage"
+  },
+  {
+    "key": "javadoc.JavadocParagraphCheck",
+    "name": "Javadoc Paragraph",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocparagraph.html#JavadocParagraph"
+  },
+  {
+    "key": "javadoc.JavadocStyleCheck",
+    "name": "Javadoc Style",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocstyle.html#JavadocStyle"
+  },
+  {
+    "key": "javadoc.JavadocTagContinuationIndentationCheck",
+    "name": "Javadoc Tag Continuation Indentation",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadoctagcontinuationindentation.html#JavadocTagContinuationIndentation"
+  },
+  {
+    "key": "javadoc.JavadocTypeCheck",
+    "name": "Javadoc Type",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadoctype.html#JavadocType"
+  },
+  {
+    "key": "javadoc.JavadocVariableCheck",
+    "name": "Javadoc Variable",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/javadocvariable.html#JavadocVariable"
+  },
+  {
+    "key": "javadoc.MissingJavadocMethodCheck",
+    "name": "Missing Javadoc Method",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/missingjavadocmethod.html#MissingJavadocMethod"
+  },
+  {
+    "key": "javadoc.MissingJavadocPackageCheck",
+    "name": "Missing Javadoc Package",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/missingjavadocpackage.html#MissingJavadocPackage"
+  },
+  {
+    "key": "javadoc.MissingJavadocTypeCheck",
+    "name": "Missing Javadoc Type",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/missingjavadoctype.html#MissingJavadocType"
+  },
+  {
+    "key": "javadoc.NonEmptyAtclauseDescriptionCheck",
+    "name": "Non Empty At-clause Description",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/nonemptyatclausedescription.html#NonEmptyAtclauseDescription"
+  },
+  {
+    "key": "javadoc.RequireEmptyLineBeforeBlockTagGroupCheck",
+    "name": "Require Empty Line Before Block Tag Group",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/requireemptylinebeforeblocktaggroup.html#RequireEmptyLineBeforeBlockTagGroup"
+  },
+  {
+    "key": "javadoc.SingleLineJavadocCheck",
+    "name": "Single Line Javadoc",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/singlelinejavadoc.html#SingleLineJavadoc"
+  },
+  {
+    "key": "javadoc.SummaryJavadocCheck",
+    "name": "Summary Javadoc",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/summaryjavadoc.html#SummaryJavadoc"
+  },
+  {
+    "key": "javadoc.WriteTagCheck",
+    "name": "Write Tag",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/javadoc/writetag.html#WriteTag"
+  },
+  {
+    "key": "metrics.BooleanExpressionComplexityCheck",
+    "name": "Boolean Expression Complexity",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/metrics/booleanexpressioncomplexity.html#BooleanExpressionComplexity"
+  },
+  {
+    "key": "metrics.ClassDataAbstractionCouplingCheck",
+    "name": "Class Data Abstraction Coupling",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/metrics/classdataabstractioncoupling.html#ClassDataAbstractionCoupling"
+  },
+  {
+    "key": "metrics.ClassFanOutComplexityCheck",
+    "name": "Class Fan Out Complexity",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/metrics/classfanoutcomplexity.html#ClassFanOutComplexity"
+  },
+  {
+    "key": "metrics.CyclomaticComplexityCheck",
+    "name": "Cyclomatic Complexity",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/metrics/cyclomaticcomplexity.html#CyclomaticComplexity"
+  },
+  {
+    "key": "metrics.JavaNCSSCheck",
+    "name": "Java NCSS",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/metrics/javancss.html#JavaNCSS"
+  },
+  {
+    "key": "metrics.NPathComplexityCheck",
+    "name": "NPath Complexity",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/metrics/npathcomplexity.html#NPathComplexity"
+  },
+  {
+    "key": "modifier.ClassMemberImpliedModifierCheck",
+    "name": "Class Member Implied Modifier",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/modifier/classmemberimpliedmodifier.html#ClassMemberImpliedModifier"
+  },
+  {
+    "key": "modifier.InterfaceMemberImpliedModifierCheck",
+    "name": "Interface Member Implied Modifier",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/modifier/interfacememberimpliedmodifier.html#InterfaceMemberImpliedModifier"
+  },
+  {
+    "key": "modifier.ModifierOrderCheck",
+    "name": "Modifier Order",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/modifier/modifierorder.html#ModifierOrder"
+  },
+  {
+    "key": "modifier.RedundantModifierCheck",
+    "name": "Redundant Modifier",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/modifier/redundantmodifier.html#RedundantModifier"
+  },
+  {
+    "key": "naming.AbbreviationAsWordInNameCheck",
+    "name": "Abbreviation As Word In Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/abbreviationaswordinname.html#AbbreviationAsWordInName"
+  },
+  {
+    "key": "naming.AbstractClassNameCheck",
+    "name": "Abstract Class Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/abstractclassname.html#AbstractClassName"
+  },
+  {
+    "key": "naming.CatchParameterNameCheck",
+    "name": "Catch Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/catchparametername.html#CatchParameterName"
+  },
+  {
+    "key": "naming.ClassTypeParameterNameCheck",
+    "name": "Class Type Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/classtypeparametername.html#ClassTypeParameterName"
+  },
+  {
+    "key": "naming.ConstantNameCheck",
+    "name": "Constant Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/constantname.html#ConstantName"
+  },
+  {
+    "key": "naming.IllegalIdentifierNameCheck",
+    "name": "Illegal Identifier Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/illegalidentifiername.html#IllegalIdentifierName"
+  },
+  {
+    "key": "naming.InterfaceTypeParameterNameCheck",
+    "name": "Interface Type Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/interfacetypeparametername.html#InterfaceTypeParameterName"
+  },
+  {
+    "key": "naming.LambdaParameterNameCheck",
+    "name": "Lambda Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/lambdaparametername.html#LambdaParameterName"
+  },
+  {
+    "key": "naming.LocalFinalVariableNameCheck",
+    "name": "Local Final Variable Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/localfinalvariablename.html#LocalFinalVariableName"
+  },
+  {
+    "key": "naming.LocalVariableNameCheck",
+    "name": "Local Variable Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/localvariablename.html#LocalVariableName"
+  },
+  {
+    "key": "naming.MemberNameCheck",
+    "name": "Member Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/membername.html#MemberName"
+  },
+  {
+    "key": "naming.MethodNameCheck",
+    "name": "Method Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/methodname.html#MethodName"
+  },
+  {
+    "key": "naming.MethodTypeParameterNameCheck",
+    "name": "Method Type Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/methodtypeparametername.html#MethodTypeParameterName"
+  },
+  {
+    "key": "naming.PackageNameCheck",
+    "name": "Package Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/packagename.html#PackageName"
+  },
+  {
+    "key": "naming.ParameterNameCheck",
+    "name": "Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/parametername.html#ParameterName"
+  },
+  {
+    "key": "naming.PatternVariableNameCheck",
+    "name": "Pattern Variable Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/patternvariablename.html#PatternVariableName"
+  },
+  {
+    "key": "naming.RecordComponentNameCheck",
+    "name": "Record Component Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/recordcomponentname.html#RecordComponentName"
+  },
+  {
+    "key": "naming.RecordTypeParameterNameCheck",
+    "name": "Record Type Parameter Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/recordtypeparametername.html#RecordTypeParameterName"
+  },
+  {
+    "key": "naming.StaticVariableNameCheck",
+    "name": "Static Variable Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/staticvariablename.html#StaticVariableName"
+  },
+  {
+    "key": "naming.TypeNameCheck",
+    "name": "Type Name",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/naming/typename.html#TypeName"
+  },
+  {
+    "key": "regexp.RegexpCheck",
+    "name": "Regexp",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/regexp/regexp.html#Regexp"
+  },
+  {
+    "key": "regexp.RegexpMultilineCheck",
+    "name": "Regexp Multiline",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/regexp/regexpmultiline.html#RegexpMultiline"
+  },
+  {
+    "key": "regexp.RegexpOnFilenameCheck",
+    "name": "Regexp On Filename",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/regexp/regexponfilename.html#RegexpOnFilename"
+  },
+  {
+    "key": "regexp.RegexpSinglelineCheck",
+    "name": "Regexp Singleline",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/regexp/regexpsingleline.html#RegexpSingleline"
+  },
+  {
+    "key": "regexp.RegexpSinglelineJavaCheck",
+    "name": "Regexp Singleline Java",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/regexp/regexpsinglelinejava.html#RegexpSinglelineJava"
+  },
+  {
+    "key": "sizes.AnonInnerLengthCheck",
+    "name": "Anon Inner Length",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/anoninnerlength.html#AnonInnerLength"
+  },
+  {
+    "key": "sizes.ExecutableStatementCountCheck",
+    "name": "Executable Statement Count",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/executablestatementcount.html#ExecutableStatementCount"
+  },
+  {
+    "key": "sizes.FileLengthCheck",
+    "name": "File Length",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/filelength.html#FileLength"
+  },
+  {
+    "key": "sizes.LambdaBodyLengthCheck",
+    "name": "Lambda Body Length",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/lambdabodylength.html#LambdaBodyLength"
+  },
+  {
+    "key": "sizes.LineLengthCheck",
+    "name": "Line Length",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/linelength.html#LineLength"
+  },
+  {
+    "key": "sizes.MethodCountCheck",
+    "name": "Method Count",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/methodcount.html#MethodCount"
+  },
+  {
+    "key": "sizes.MethodLengthCheck",
+    "name": "Method Length",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/methodlength.html#MethodLength"
+  },
+  {
+    "key": "sizes.OuterTypeNumberCheck",
+    "name": "Outer Type Number",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/outertypenumber.html#OuterTypeNumber"
+  },
+  {
+    "key": "sizes.ParameterNumberCheck",
+    "name": "Parameter Number",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/parameternumber.html#ParameterNumber"
+  },
+  {
+    "key": "sizes.RecordComponentNumberCheck",
+    "name": "Record Component Number",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/sizes/recordcomponentnumber.html#RecordComponentNumber"
+  },
+  {
+    "key": "whitespace.EmptyForInitializerPadCheck",
+    "name": "Empty For Initializer Pad",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/emptyforinitializerpad.html#EmptyForInitializerPad"
+  },
+  {
+    "key": "whitespace.EmptyForIteratorPadCheck",
+    "name": "Empty For Iterator Pad",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/emptyforiteratorpad.html#EmptyForIteratorPad"
+  },
+  {
+    "key": "whitespace.EmptyLineSeparatorCheck",
+    "name": "Empty Line Separator",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/emptylineseparator.html#EmptyLineSeparator"
+  },
+  {
+    "key": "whitespace.FileTabCharacterCheck",
+    "name": "File Tab Character",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/filetabcharacter.html#FileTabCharacter"
+  },
+  {
+    "key": "whitespace.GenericWhitespaceCheck",
+    "name": "Generic Whitespace",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/genericwhitespace.html#GenericWhitespace"
+  },
+  {
+    "key": "whitespace.MethodParamPadCheck",
+    "name": "Method Param Pad",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/methodparampad.html#MethodParamPad"
+  },
+  {
+    "key": "whitespace.NoLineWrapCheck",
+    "name": "No Line Wrap",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/nolinewrap.html#NoLineWrap"
+  },
+  {
+    "key": "whitespace.NoWhitespaceAfterCheck",
+    "name": "No Whitespace After",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/nowhitespaceafter.html#NoWhitespaceAfter"
+  },
+  {
+    "key": "whitespace.NoWhitespaceBeforeCaseDefaultColonCheck",
+    "name": "No Whitespace Before Case Default Colon",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/nowhitespacebeforecasedefaultcolon.html#NoWhitespaceBeforeCaseDefaultColon"
+  },
+  {
+    "key": "whitespace.NoWhitespaceBeforeCheck",
+    "name": "No Whitespace Before",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/nowhitespacebefore.html#NoWhitespaceBefore"
+  },
+  {
+    "key": "whitespace.OperatorWrapCheck",
+    "name": "Operator Wrap",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/operatorwrap.html#OperatorWrap"
+  },
+  {
+    "key": "whitespace.ParenPadCheck",
+    "name": "Paren Pad",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/parenpad.html#ParenPad"
+  },
+  {
+    "key": "whitespace.SeparatorWrapCheck",
+    "name": "Separator Wrap",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/separatorwrap.html#SeparatorWrap"
+  },
+  {
+    "key": "whitespace.SingleSpaceSeparatorCheck",
+    "name": "Single Space Separator",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/singlespaceseparator.html#SingleSpaceSeparator"
+  },
+  {
+    "key": "whitespace.TypecastParenPadCheck",
+    "name": "Typecast Paren Pad",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/typecastparenpad.html#TypecastParenPad"
+  },
+  {
+    "key": "whitespace.WhitespaceAfterCheck",
+    "name": "Whitespace After",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/whitespaceafter.html#WhitespaceAfter"
+  },
+  {
+    "key": "whitespace.WhitespaceAroundCheck",
+    "name": "Whitespace Around",
+    "type": "CODE_SMELL",
+    "severity": "MAJOR",
+    "url": "https://checkstyle.sourceforge.net/checks/whitespace/whitespacearound.html#WhitespaceAround"
+  }
+]

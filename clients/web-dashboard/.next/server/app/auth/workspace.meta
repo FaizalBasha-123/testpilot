@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/auth/layout,_N_T_/auth/workspace/layout,_N_T_/auth/workspace/page,_N_T_/auth/workspace/"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/auth/workspace/__PAGE__",
+    "/auth/workspace",
+    "/auth",
+    "/_index",
+    "/_head"
+  ]
+}

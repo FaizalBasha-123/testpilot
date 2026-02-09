@@ -1,0 +1,205 @@
+/* [project]/app/globals.css [app-client] (css) */
+:root {
+  --lightningcss-light: ;
+  --lightningcss-dark: initial;
+  color-scheme: dark;
+  color: #e6edf3;
+  background: #0b0f14;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: radial-gradient(circle at top, #111827, #0b0f14 45%);
+  min-height: 100vh;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.hero {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: center;
+  gap: 32px;
+  display: grid;
+}
+
+.card {
+  background: #111827;
+  border: 1px solid #ffffff14;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 60px #0006;
+}
+
+.button {
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(120deg, #3b82f6, #8b5cf6);
+  border: none;
+  border-radius: 999px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  font-weight: 600;
+  display: inline-flex;
+}
+
+.button.secondary {
+  background: #1f2937;
+}
+
+.grid {
+  gap: 16px;
+  display: grid;
+}
+
+.repo {
+  background: #0f172a;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  display: flex;
+}
+
+.badge {
+  color: #93c5fd;
+  background: #3b82f633;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.header {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  display: flex;
+}
+
+.muted {
+  color: #94a3b8;
+}
+
+.nav {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 48px;
+  display: flex;
+}
+
+.logo {
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  display: inline-flex;
+}
+
+.glow-panel {
+  background: linear-gradient(135deg, #3b82f633, #8b5cf633);
+  border: 1px solid #6366f14d;
+  border-radius: 24px;
+  padding: 32px;
+}
+
+.hero-title {
+  margin: 18px 0 12px;
+  font-size: clamp(36px, 5vw, 56px);
+}
+
+.tag {
+  color: #93c5fd;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: #3b82f633;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  display: inline-flex;
+}
+
+.pill-row {
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  display: flex;
+}
+
+.pill {
+  color: #cbd5f5;
+  background: #0f172acc;
+  border: 1px solid #94a3b833;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.hero-art {
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  position: relative;
+}
+
+.hero-art img {
+  width: min(460px, 85%);
+  height: auto;
+}
+
+.login-wrap {
+  place-items: center;
+  min-height: 100vh;
+  padding: 48px 24px;
+  display: grid;
+}
+
+.login-card {
+  background: #0b1220;
+  border: 1px solid #94a3b833;
+  border-radius: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 32px;
+  width: min(1100px, 100%);
+  padding: 32px;
+  display: grid;
+  box-shadow: 0 30px 80px #00000080;
+}
+
+.login-column {
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  display: flex;
+}
+
+.login-illustration {
+  background: #0f172a;
+  border-radius: 24px;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  display: flex;
+}
+
+.login-illustration img {
+  width: 100%;
+  max-width: 520px;
+}
+
+/*# sourceMappingURL=app_globals_71f961d1.css.map*/
