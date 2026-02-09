@@ -1,10 +1,10 @@
 {
     "$schema": "https://openapi.vercel.sh/vercel.json",
-    "buildCommand": "cd clients/web-dashboard && npm install && npm run build",
-    "outputDirectory": "clients/web-dashboard/.next",
+    "buildCommand": "npm run build",
+    "outputDirectory": ".next",
     "framework": "nextjs",
-    "installCommand": "cd clients/web-dashboard && npm install",
-    "devCommand": "cd clients/web-dashboard && npm run dev",
+    "installCommand": "npm install",
+    "devCommand": "npm run dev",
     "regions": [
         "iad1"
     ],
