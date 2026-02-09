@@ -1,0 +1,113 @@
+/*
+ * SonarQube Java
+ * Copyright (C) 2012-2025 SonarSource Sàrl
+ * mailto:info AT sonarsource DOT com
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the Sonar Source-Available License Version 1, as published by SonarSource SA.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the Sonar Source-Available License for more details.
+ *
+ * You should have received a copy of the Sonar Source-Available License
+ * along with this program; if not, see https://sonarsource.com/license/ssal/
+ */
+package org.sonar.java.checks;
+
+import org.sonar.check.Rule;
+import org.sonar.java.model.ExpressionUtils;
+import org.sonar.java.model.LiteralUtils;
+import org.sonar.plugins.java.api.IssuableSubscriptionVisitor;
+import org.sonar.plugins.java.api.semantic.Symbol;
+import org.sonar.plugins.java.api.semantic.Type;
+import org.sonar.plugins.java.api.tree.Arguments;
+import org.sonar.plugins.java.api.tree.ExpressionTree;
+import org.sonar.plugins.java.api.tree.MethodInvocationTree;
+import org.sonar.plugins.java.api.tree.MethodTree;
+import org.sonar.plugins.java.api.tree.NewArrayTree;
+import org.sonar.plugins.java.api.tree.NewClassTree;
+import org.sonar.plugins.java.api.tree.Tree;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.IntStream;
+
+@Rule(key = "S3878")
+public class ArrayForVarArgCheck extends IssuableSubscriptionVisitor {
+
+  @Override
+  public List<Tree.Kind> nodesToVisit() {
+    return Arrays.asList(Tree.Kind.METHOD_INVOCATION, Tree.Kind.NEW_CLASS);
+  }
+
+  @Override
+  public void visitNode(Tree tree) {
+    Symbol.MethodSymbol sym;
+    Arguments args;
+    if (tree.is(Tree.Kind.NEW_CLASS)) {
+      NewClassTree nct = (NewClassTree) tree;
+      sym = nct.methodSymbol();
+      args = nct.arguments();
+    } else {
+      MethodInvocationTree mit = (MethodInvocationTree) tree;
+      sym = mit.methodSymbol();
+      args = mit.arguments();
+    }
+
+    if (!sym.isUnknown() && isLastArgumentVarargs(sym, args)) {
+      ExpressionTree lastArg = args.get(args.size() - 1);
+      checkInvokedMethod(sym, lastArg);
+    }
+  }
+
+  private void checkInvokedMethod(Symbol.MethodSymbol methodSymbol, ExpressionTree lastArg) {
+    if (lastArg.is(Tree.Kind.NEW_ARRAY)) {
+      Type lastParamType = getLastParameterType(methodSymbol.parameterTypes());
+      Type lastArgType = lastArg.symbolType();
+      if (lastParamType.isUnknown() || lastArgType.isUnknown()) {
+        return;
+      }
+      if ("java.lang.Object[]".equals(lastParamType.fullyQualifiedName())) {
+        reportIssue(lastArg, "Disambiguate this call by either casting as \"Object\" or \"Object[]\".");
+      } else if (lastArgType.isSubtypeOf(lastParamType)) {
+        reportIssueForSameType(methodSymbol, (NewArrayTree) lastArg);
+      }
+    }
+  }
+
+  private void reportIssueForSameType(Symbol.MethodSymbol methodSymbol, NewArrayTree newArrayTree) {
+    String message = "Remove this array creation";
+    if (newArrayTree.openBraceToken() == null) {
+      ExpressionTree expression = newArrayTree.dimensions().get(0).expression();
+      Integer literalValue = LiteralUtils.intLiteralValue(expression);
+      if (literalValue == null || literalValue != 0 || isCallingOverload(methodSymbol, newArrayTree)) {
+        return;
+      }
+    } else if (!newArrayTree.initializers().isEmpty()) {
+      message += " and simply pass the elements";
+    }
+    reportIssue(newArrayTree, message + ".");
+  }
+
+  private static boolean isLastArgumentVarargs(Symbol.MethodSymbol methodSymbol, Arguments args) {
+    // If we have less arguments than parameter types, it means that no arguments was pass to the varargs.
+    // If we have more, the last argument can not be an array.
+    return !args.isEmpty() && methodSymbol.isVarArgsMethod() && args.size() == methodSymbol.parameterTypes().size();
+  }
+
+  private static Type getLastParameterType(List<? extends Type> list) {
+    return list.get(list.size() - 1);
+  }
+
+  private static boolean isCallingOverload(Symbol.MethodSymbol methodSymbol, ExpressionTree lastArg) {
+    MethodTree enclosing = ExpressionUtils.getEnclosingMethod(lastArg);
+    return enclosing != null && haveSameParamButLast(enclosing.symbol(), methodSymbol);
+  }
+
+  private static boolean haveSameParamButLast(Symbol.MethodSymbol enclosing, Symbol.MethodSymbol methodSymbol) {
+    return enclosing.name().equals(methodSymbol.name())
+      && IntStream.range(0, enclosing.parameterTypes().size()).allMatch(i -> enclosing.parameterTypes().get(i) == methodSymbol.parameterTypes().get(i));
+  }
+}

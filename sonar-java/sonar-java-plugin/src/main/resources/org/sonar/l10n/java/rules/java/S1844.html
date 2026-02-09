@@ -1,0 +1,30 @@
+<h2>Why is this an issue?</h2>
+<p>The <code>java.util.concurrent.locks.Condition</code> interface provides an alternative to the <code>Object</code> monitor methods
+(<code>wait</code>, <code>notify</code> and <code>notifyAll</code>). Hence, the purpose of implementing said interface is to gain access to its more
+nuanced <code>await</code> methods.</p>
+<p>Consequently, calling the method <code>Object.wait</code> on a class implementing the <code>Condition</code> interface is contradictory and should
+be avoided. Use <code>Condition.await</code> instead.</p>
+<h3>Code examples</h3>
+<h4>Noncompliant code example</h4>
+<pre data-diff-id="1" data-diff-type="noncompliant">
+void doSomething(Condition condition) {
+    condition.wait(); // Noncompliant, Object.wait is called
+
+        ...
+}
+</pre>
+<h4>Compliant solution</h4>
+<pre data-diff-id="1" data-diff-type="compliant">
+void doSomething(Condition condition) {
+    condition.await(); // Compliant, Condition.await is called
+
+        ...
+}
+</pre>
+<h2>Resources</h2>
+<h3>Documentation</h3>
+<ul>
+  <li> <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/locks/Condition.html">Interface Condition - Java™ Platform SE 8, API
+  Specification</a> </li>
+</ul>
+

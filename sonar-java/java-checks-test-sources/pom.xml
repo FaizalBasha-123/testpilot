@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.sonarsource.java</groupId>
+    <artifactId>java</artifactId>
+    <version>8.24.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>java-checks-test-sources</artifactId>
+  <packaging>pom</packaging>
+
+  <name>SonarQube Java :: Checks Test Sources :: Parent Pom</name>
+  <description>Code Analyzer for Java :: Checks Test Sources :: Parent POM</description>
+
+  <modules>
+    <module>aws</module>
+    <module>default</module>
+    <module>java-17</module>
+    <module>spring-3.2</module>
+    <module>spring-web-4.0</module>
+
+    <!-- should be the last module to be able to test classpath files "target/test-classpath.txt" of the previous modules -->
+    <module>test-classpath-reader</module>
+  </modules>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>build-classpath</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <fileSeparator>/</fileSeparator>
+              <pathSeparator>:${line.separator}</pathSeparator>
+              <includeScope>test</includeScope>
+              <localRepoProperty>M2_REPO</localRepoProperty>
+              <outputEncoding>UTF-8</outputEncoding>
+              <outputFile>${project.build.directory}/test-classpath.txt</outputFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy</id>
+            <phase>test-compile</phase>
+            <inherited>false</inherited>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.testng</groupId>
+                  <artifactId>testng</artifactId>
+                  <version>7.5.1</version>
+                  <type>jar</type>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>${project.build.directory}/test-jars</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
