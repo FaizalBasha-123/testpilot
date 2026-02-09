@@ -1,0 +1,304 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// User & Authentication
+// ===========================================
+
+model User {
+  id            String   @id @default(cuid())
+  githubId      String?  @unique
+  gitlabId      String?  @unique
+  email         String?  @unique
+  name          String?
+  avatarUrl     String?
+  
+  // Credits system
+  credits       Int      @default(100) // Free tier starts with 100 credits
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  installations Installation[]
+  reviews       Review[]
+  transactions  Transaction[]
+  apiKeys       ApiKey[]
+  accounts      Account[]
+
+  @@index([email])
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  keyHash     String   @unique // Store hashed version of the key
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ===========================================
+// Git Provider Installations
+// ===========================================
+
+model Installation {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        Provider
+  installationId  String   // GitHub/GitLab installation ID
+  accessToken     String?  // Encrypted access token
+  refreshToken    String?  // Encrypted refresh token
+  tokenExpiresAt  DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositories    Repository[]
+
+  @@unique([provider, installationId])
+  @@index([userId])
+}
+
+model Repository {
+  id              String   @id @default(cuid())
+  installationId  String
+  name            String   // e.g., "my-repo"
+  fullName        String   // e.g., "owner/my-repo"
+  defaultBranch   String   @default("main")
+  isActive        Boolean  @default(true) // Whether reviews are enabled
+  
+  // Configuration (stored as JSON, maps to .blackbox.yaml)
+  config          Json?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  installation    Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  reviews         Review[]
+  learnings       Learning[]
+
+  @@unique([installationId, fullName])
+  @@index([fullName])
+}
+
+// ===========================================
+// Code Reviews
+// ===========================================
+
+model Review {
+  id              String       @id @default(cuid())
+  repositoryId    String
+  userId          String
+  
+  // PR Information
+  prNumber        Int
+  prTitle         String?
+  prUrl           String?
+  headSha         String       // Commit SHA being reviewed
+  baseBranch      String?
+  headBranch      String?
+  
+  // Review Status
+  status          ReviewStatus @default(PENDING)
+  
+  // Cost tracking
+  creditsUsed     Int          @default(0)
+  modelUsed       String?      // e.g., "anthropic/claude-3.5-sonnet"
+  tokensUsed      Int?         // Total tokens consumed
+  
+  // Summary
+  summary         String?      // AI-generated summary
+  
+  // Timestamps
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  // Relations
+  repository      Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  findings        Finding[]
+
+  @@index([repositoryId])
+  @@index([userId])
+  @@index([prNumber])
+}
+
+model Finding {
+  id            String      @id @default(cuid())
+  reviewId      String
+  
+  // Finding details
+  type          FindingType
+  severity      Severity
+  source        FindingSource // STATIC or AI
+  
+  // Location
+  file          String
+  startLine     Int?
+  endLine       Int?
+  
+  // Content
+  title         String
+  message       String      @db.Text
+  suggestion    String?     @db.Text // Suggested fix
+  codeSnippet   String?     @db.Text // Relevant code
+  
+  // For GitHub comments
+  commentId     String?     // GitHub comment ID after posting
+  
+  createdAt     DateTime    @default(now())
+  
+  // Relations
+  review        Review      @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([type])
+  @@index([severity])
+}
+
+// ===========================================
+// Credits & Billing
+// ===========================================
+
+model Transaction {
+  id            String          @id @default(cuid())
+  userId        String
+  type          TransactionType
+  credits       Int             // Positive for purchases, negative for usage
+  
+  // For purchases
+  amountCents   Int?            // Amount in cents (e.g., 450 = $4.50)
+  currency      String?         @default("usd")
+  stripePaymentId String?       @unique
+  
+  // For usage
+  reviewId      String?
+  description   String?
+  
+  createdAt     DateTime        @default(now())
+  
+  // Relations
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ===========================================
+// Knowledge Base
+// ===========================================
+
+model Learning {
+  id            String   @id @default(cuid())
+  repositoryId  String
+  
+  // What the system learned
+  pattern       String   @db.Text // Code pattern or issue
+  resolution    String   @db.Text // How it was resolved
+  category      String   // e.g., "security", "style", "logic"
+  
+  // Metadata
+  prNumber      Int?     // Source PR
+  isApproved    Boolean  @default(false) // User verified this learning
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  repository    Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryId])
+  @@index([category])
+}
+
+// ===========================================
+// Enums
+// ===========================================
+
+enum Provider {
+  GITHUB
+  GITLAB
+  BITBUCKET
+}
+
+enum ReviewStatus {
+  PENDING     // Waiting to start
+  CLONING     // Cloning repository
+  ANALYZING   // Running analysis
+  REVIEWING   // AI reviewing
+  POSTING     // Posting comments
+  COMPLETED   // Done
+  FAILED      // Error occurred
+}
+
+enum FindingType {
+  SECURITY        // SQL Injection, XSS, etc.
+  CREDENTIAL      // Hardcoded secrets
+  LOGIC_BUG       // Business logic errors
+  CODE_SMELL      // Maintainability issues
+  IMPROVEMENT     // Suggestions
+  DOCUMENTATION   // Doc improvements
+}
+
+enum Severity {
+  CRITICAL    // Must fix before merge
+  HIGH        // Should fix
+  MEDIUM      // Consider fixing
+  LOW         // Nice to have
+  INFO        // Informational
+}
+
+enum FindingSource {
+  STATIC      // From static analysis (Semgrep, etc.)
+  AI          // From LLM analysis
+  COMBINED    // Both detected it
+}
+
+enum TransactionType {
+  PURCHASE    // User bought credits
+  USAGE       // Credits consumed by review
+  REFUND      // Credits refunded
+  BONUS       // Free credits (signup, promo, etc.)
+}

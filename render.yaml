@@ -1,0 +1,118 @@
+# TestPilot - Render Blueprint
+# Deploy with: render blueprint sync
+
+services:
+  # ============================================
+  # Gateway (Go) - HTTP Gateway, Auth, Webhooks
+  # ============================================
+  - type: web
+    name: testpilot-gateway
+    runtime: go
+    repo: https://github.com/YOUR_USERNAME/blackboxtester-mvp
+    branch: main
+    rootDir: services/gateway
+    buildCommand: go build -o gateway .
+    startCommand: ./gateway
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: AI_CORE_URL
+        value: https://testpilot-ai-core.onrender.com
+      - key: SONAR_SERVICE_URL
+        value: https://testpilot-sonar-scanner.onrender.com
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: testpilot-db
+          property: connectionString
+    autoDeploy: true
+
+  # ============================================
+  # AI Core (Python) - Review Engine, AI Logic
+  # ============================================
+  - type: web
+    name: testpilot-ai-core
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/blackboxtester-mvp
+    branch: main
+    rootDir: services/ai-core
+    dockerfilePath: docker/Dockerfile
+    dockerContext: .
+    plan: standard # Needs more memory for LLM calls
+    healthCheckPath: /health
+    envVars:
+      - key: SONAR_SERVICE_URL
+        value: https://testpilot-sonar-scanner.onrender.com
+      - key: SONARQUBE__URL
+        sync: false # Set to your self-hosted SonarQube URL
+      - key: SONARQUBE__TOKEN
+        sync: false
+      - key: OPENROUTER__KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CONFIG__MODEL
+        value: groq/llama-3.3-70b-versatile
+      - key: QDRANT_URL
+        sync: false # Optional: external Qdrant
+      - key: DATABASE_URL
+        fromDatabase:
+          name: testpilot-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: testpilot-redis
+          type: redis
+          property: connectionString
+    autoDeploy: true
+
+  # ============================================
+  # Sonar Scanner (Rust) - Static Analysis
+  # ============================================
+  - type: web
+    name: testpilot-sonar-scanner
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/blackboxtester-mvp
+    branch: main
+    rootDir: services/sonar-scanner
+    dockerfilePath: Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: SONARQUBE_URL
+        sync: false # Set to your self-hosted SonarQube URL
+      - key: SONARQUBE_TOKEN
+        sync: false
+      - key: SONARQUBE_PASSWORD
+        sync: false
+      - key: UPLOAD_LIMIT_MB
+        value: "1024"
+    autoDeploy: true
+
+# ============================================
+# Databases
+# ============================================
+databases:
+  - name: testpilot-db
+    plan: starter
+    databaseName: testpilot
+    user: testpilot
+
+  # ============================================
+  # Redis (Caching & Job Queue)
+  # ============================================
+  - name: testpilot-redis
+    type: redis
+    plan: starter
+    ipAllowList: [] # Only internal access

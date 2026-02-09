@@ -1,0 +1,44 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "buildCommand": "cd clients/web-dashboard && npm install && npm run build",
+    "outputDirectory": "clients/web-dashboard/.next",
+    "framework": "nextjs",
+    "installCommand": "cd clients/web-dashboard && npm install",
+    "devCommand": "cd clients/web-dashboard && npm run dev",
+    "regions": [
+        "iad1"
+    ],
+    "env": {
+        "NEXT_PUBLIC_API_URL": "https://testpilot-gateway.onrender.com",
+        "NEXT_PUBLIC_APP_NAME": "TestPilot"
+    },
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Access-Control-Allow-Credentials",
+                    "value": "true"
+                },
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
+                },
+                {
+                    "key": "Access-Control-Allow-Methods",
+                    "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT"
+                },
+                {
+                    "key": "Access-Control-Allow-Headers",
+                    "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+                }
+            ]
+        }
+    ],
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://testpilot-gateway.onrender.com/api/:path*"
+        }
+    ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "blackboxtester-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered code review platform combining static analysis with LLM intelligence",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "npm run db:generate --workspace=@blackbox/database",
+    "db:push": "npm run db:push --workspace=@blackbox/database",
+    "db:migrate": "npm run db:migrate --workspace=@blackbox/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "prettier": "^3.4.0",
+    "eslint": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}

@@ -1,0 +1,6 @@
+[sonarqube]
+url = "http://sonarqube:9000"
+token = ""
+include_security = true
+include_bugs = true
+include_code_smells = false

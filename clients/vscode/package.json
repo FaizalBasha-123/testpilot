@@ -1,0 +1,114 @@
+{
+    "name": "testpilot",
+    "displayName": "TestPilot",
+    "description": "AI + Static Analysis Code Review (TestPilot)",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [],
+    "extensionDependencies": [
+        "vscode.git"
+    ],
+    "main": "./out/clients/vscode/src/extension.js",
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "testpilot-sidebar",
+                    "title": "TestPilot",
+                    "icon": "$(beaker)"
+                }
+            ]
+        },
+        "views": {
+            "testpilot-sidebar": [
+                {
+                    "type": "webview",
+                    "id": "testpilot.sidebarView",
+                    "name": "TestPilot"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "testpilot.reviewFile",
+                "title": "TestPilot: Review Active File"
+            },
+            {
+                "command": "testpilot.fixSelection",
+                "title": "TestPilot: Fix Selection"
+            },
+            {
+                "command": "testpilot.scanWorkspace",
+                "title": "TestPilot: Scan Workspace"
+            },
+            {
+                "command": "testpilot.reviewCommit",
+                "title": "TestPilot: Review Commit",
+                "icon": "$(eye)"
+            },
+            {
+                "command": "testpilot.refreshCommits",
+                "title": "TestPilot: Refresh Commits",
+                "icon": "$(refresh)"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "testpilot.fixSelection",
+                    "group": "testpilot",
+                    "when": "editorHasSelection"
+                },
+                {
+                    "command": "testpilot.reviewFile",
+                    "group": "testpilot"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "testpilot.refreshCommits",
+                    "when": "view == testpilot.commitReviews",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "testpilot.reviewCommit",
+                    "when": "view == testpilot.commitReviews && viewItem == commit",
+                    "group": "inline"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "TestPilot",
+            "properties": {
+                "testpilot.backendUrl": {
+                    "type": "string",
+                    "default": "http://localhost:8001",
+                    "description": "URL of the TestPilot backend API"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "dependencies": {
+        "form-data": "^4.0.5",
+        "jszip": "^3.10.1",
+        "node-fetch": "^2.7.0"
+    },
+    "devDependencies": {
+        "@types/node": "16.x",
+        "@types/node-fetch": "^2.6.13",
+        "@types/vscode": "^1.75.0",
+        "typescript": "^4.9.0"
+    }
+}

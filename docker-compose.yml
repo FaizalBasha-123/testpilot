@@ -1,0 +1,170 @@
+# ==========================================================
+# TestPilot - Docker Compose
+# ==========================================================
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose up sonarqube redis # Start only infrastructure
+#   docker-compose logs -f ai-core    # View AI Core logs
+# ==========================================================
+
+services:
+  # ----------------------------------------------------------
+  # SonarQube - Static Code Analysis Server
+  # ----------------------------------------------------------
+  # Access at: http://localhost:9000
+  # Default credentials: admin/admin (change on first login)
+  # ----------------------------------------------------------
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: testpilot-sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+      - SONAR_ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - SONAR_WEB_JAVA_OPTS=-Xms512m -Xmx512m
+      - SONAR_CE_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_logs:/opt/sonarqube/logs
+      - sonar_extensions:/opt/sonarqube/extensions
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/api/system/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    mem_limit: 2g
+
+  # ----------------------------------------------------------
+  # PostgreSQL - User & Credit Database
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: testpilot-postgres
+    environment:
+      POSTGRES_DB: testpilot
+      POSTGRES_USER: testpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-testpilot_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # Redis - Caching & Job Queue
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: testpilot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # SERVICE 1: Sonar Scanner (Static Analysis)
+  # ----------------------------------------------------------
+  sonar-scanner:
+    build:
+      context: services/sonar-scanner
+      dockerfile: Dockerfile
+    container_name: testpilot-sonar-scanner
+    ports:
+      - "8001:8000"
+    environment:
+      - SONARQUBE_URL=http://sonarqube:9000
+      - SONARQUBE_TOKEN=${SONARQUBE_TOKEN}
+      - SONARQUBE_PASSWORD=${SONARQUBE_PASSWORD}
+      - UPLOAD_LIMIT_MB=${UPLOAD_LIMIT_MB:-1024}
+    volumes:
+      - /tmp/sonar_uploads:/tmp/sonar_uploads
+    mem_limit: 4g
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ----------------------------------------------------------
+  # SERVICE 2: AI Core (Review Engine, Context, Model Adapters)
+  # ----------------------------------------------------------
+  ai-core:
+    build:
+      context: services/ai-core
+      dockerfile: docker/Dockerfile
+      target: github_app
+    container_name: testpilot-ai-core
+    ports:
+      - "3000:3000"
+    environment:
+      - SONAR_SERVICE_URL=http://sonar-scanner:8000
+      - OPENROUTER__KEY=${OPENROUTER_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - CONFIG__MODEL=groq/llama-3.3-70b-versatile
+      - SONARQUBE__ENABLED=true
+      - SONARQUBE__URL=http://sonarqube:9000
+      - SONARQUBE__TOKEN=${SONARQUBE_TOKEN}
+      - DATABASE_URL=postgresql://testpilot:${POSTGRES_PASSWORD:-testpilot_dev}@postgres:5432/testpilot
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - sonar-scanner
+      - sonarqube
+      - postgres
+      - redis
+    volumes:
+      - ./services/ai-core/pr_agent:/app/pr_agent  # Hot Reload
+      - /tmp/testpilot:/tmp/testpilot
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ----------------------------------------------------------
+  # SERVICE 3: Gateway (HTTP Gateway, Auth, Webhooks)
+  # ----------------------------------------------------------
+  gateway:
+    build:
+      context: services/gateway
+      dockerfile: Dockerfile
+    container_name: testpilot-gateway
+    ports:
+      - "3001:3000"
+    environment:
+      - AI_CORE_URL=http://ai-core:3000
+      - SONAR_SERVICE_URL=http://sonar-scanner:8000
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - QUALITY_GATE_THRESHOLD=${QUALITY_GATE_THRESHOLD:-0}
+    depends_on:
+      - ai-core
+      - sonar-scanner
+    restart: unless-stopped
+    networks:
+      - default
+
+volumes:
+  sonar_data:
+  sonar_logs:
+  sonar_extensions:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: testpilot-network
