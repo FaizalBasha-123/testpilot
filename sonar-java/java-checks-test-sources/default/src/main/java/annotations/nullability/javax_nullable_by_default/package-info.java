@@ -1,2 +1,0 @@
-@javax.annotation.ParametersAreNullableByDefault
-package annotations.nullability.javax_nullable_by_default;
