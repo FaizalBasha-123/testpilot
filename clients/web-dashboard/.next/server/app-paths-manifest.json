@@ -1,0 +1,17 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/account/page": "app/account/page.js",
+  "/auth/loading/page": "app/auth/loading/page.js",
+  "/auth/workspace/page": "app/auth/workspace/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/integrations/page": "app/integrations/page.js",
+  "/learnings/page": "app/learnings/page.js",
+  "/login/page": "app/login/page.js",
+  "/onboarding/page": "app/onboarding/page.js",
+  "/page": "app/page.js",
+  "/reports/page": "app/reports/page.js",
+  "/repositories/page": "app/repositories/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/wizard/page": "app/wizard/page.js"
+}

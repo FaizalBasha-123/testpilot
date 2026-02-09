@@ -1,0 +1,19 @@
+[00:00:00.890] Server  LOG     
+[00:00:00.890] Server  LOG       We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+[00:00:00.891] Server  LOG       The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+[00:00:00.891] Server  LOG       	- include was updated to add '.next/types/**/*.ts'
+[00:00:00.891] Server  LOG       	- include was updated to add '.next/dev/types/**/*.ts'
+[00:00:00.891] Server  LOG       	- plugins was updated to add { name: 'next' }
+[00:00:00.892] Server  LOG     
+[00:00:00.892] Server  LOG       The following mandatory changes were made to your tsconfig.json:
+
+[00:00:00.892] Server  LOG       	- jsx was set to react-jsx (next.js uses the React automatic runtime)
+[00:00:00.892] Server  LOG     
+[00:00:01.100] Server  LOG     ✓ Ready in 718ms
+[00:00:06.603] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:23.445] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:29.855] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:36.981] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:38.897] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:49.330] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

@@ -1,0 +1,17 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/account/page": "/account",
+  "/auth/loading/page": "/auth/loading",
+  "/auth/workspace/page": "/auth/workspace",
+  "/dashboard/page": "/dashboard",
+  "/integrations/page": "/integrations",
+  "/learnings/page": "/learnings",
+  "/login/page": "/login",
+  "/onboarding/page": "/onboarding",
+  "/page": "/",
+  "/reports/page": "/reports",
+  "/repositories/page": "/repositories",
+  "/settings/page": "/settings",
+  "/wizard/page": "/wizard"
+}

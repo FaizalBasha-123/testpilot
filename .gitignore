@@ -67,3 +67,8 @@ venv/
 
 # Large cloned repos (don't commit these)
 kilocode/
+
+# Nested Git Repos (Track content, ignore .git metadata)
+sonar-java/.git/
+clients/web-dashboard/.git/
+
