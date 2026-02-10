@@ -12,6 +12,7 @@ build/
 
 # Environment
 .env
+.env.example
 .env.local
 .env.*.local
 
@@ -64,6 +65,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+env/
 
 # Large cloned repos (don't commit these)
 kilocode/
