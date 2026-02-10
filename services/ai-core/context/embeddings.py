@@ -68,12 +68,14 @@ class EmbeddingsService:
             use_memory: Use in-memory Qdrant (faster for dev)
         """
         self.collection_name = collection_name
-        self.embedding_model = embedding_model
+        self.embedding_model = os.environ.get("EMBEDDING_MODEL", embedding_model)
         self.qdrant_url = qdrant_url or os.environ.get("QDRANT_URL")
         self.qdrant_api_key = qdrant_api_key or os.environ.get("QDRANT_API_KEY")
+        self.embedding_api_key = os.environ.get("GROQ_EMBEDDING_API_KEY")
+        self.embedding_api_base = os.environ.get("EMBEDDING_API_BASE", "https://api.groq.com/openai/v1")
         self.use_memory = use_memory
         self._client = None
-        self._openai = None
+        self._embedding_client = None
     
     def _init_qdrant(self):
         """Lazy initialize Qdrant client."""
@@ -97,17 +99,35 @@ class EmbeddingsService:
             # Local file-based storage
             self._client = QdrantClient(path="./qdrant_data")
         
-        # Create collection if not exists
+    def _ensure_collection(self, vector_size: int):
+        """Create or reconcile collection dimensions with current embedding model."""
+        from qdrant_client.models import Distance, VectorParams
+
         collections = self._client.get_collections().collections
-        if not any(c.name == self.collection_name for c in collections):
+        exists = any(c.name == self.collection_name for c in collections)
+        if not exists:
             self._client.create_collection(
                 collection_name=self.collection_name,
-                vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
             )
+            return
+
+        try:
+            info = self._client.get_collection(self.collection_name)
+            current_size = info.config.params.vectors.size
+            if current_size != vector_size:
+                self._client.delete_collection(self.collection_name)
+                self._client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
+                )
+        except Exception:
+            # If shape introspection fails, keep existing collection.
+            pass
     
-    def _init_openai(self):
-        """Lazy initialize OpenAI client."""
-        if self._openai is not None:
+    def _init_embedding_client(self):
+        """Lazy initialize embedding API client (OpenAI-compatible)."""
+        if self._embedding_client is not None:
             return
         
         try:
@@ -115,19 +135,19 @@ class EmbeddingsService:
         except ImportError:
             raise ImportError("Install openai: pip install openai")
         
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = self.embedding_api_key
         if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable required")
-        
-        self._openai = openai.OpenAI(api_key=api_key)
+            raise ValueError("GROQ_EMBEDDING_API_KEY is required for embeddings")
+
+        self._embedding_client = openai.OpenAI(api_key=api_key, base_url=self.embedding_api_base)
     
     def _embed(self, text: str) -> List[float]:
         """Get embedding for text."""
-        self._init_openai()
-        
-        response = self._openai.embeddings.create(
+        # Groq-hosted embeddings via OpenAI-compatible API.
+        self._init_embedding_client()
+        response = self._embedding_client.embeddings.create(
             model=self.embedding_model,
-            input=text[:8000]  # Truncate to model limit
+            input=text[:8000]
         )
         return response.data[0].embedding
     
@@ -152,8 +172,12 @@ class EmbeddingsService:
         from qdrant_client.models import PointStruct
         
         points = []
+        vector_size = None
         for chunk in chunks:
             embedding = self._embed(chunk.content)
+            if vector_size is None:
+                vector_size = len(embedding)
+                self._ensure_collection(vector_size)
             point_id = self._chunk_id(chunk)
             
             points.append(PointStruct(

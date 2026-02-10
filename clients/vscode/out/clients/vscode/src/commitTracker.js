@@ -26,11 +26,20 @@ class CommitTracker {
         this.activationSha = '';
         this.watcher = null;
         this.workspacePath = '';
+        this.installedAt = '';
         this.context = context;
     }
     initialize(workspacePath) {
         return __awaiter(this, void 0, void 0, function* () {
             this.workspacePath = workspacePath;
+            const storedInstallTs = this.context.workspaceState.get('testpilotInstalledAt');
+            if (storedInstallTs) {
+                this.installedAt = storedInstallTs;
+            }
+            else {
+                this.installedAt = new Date().toISOString();
+                yield this.context.workspaceState.update('testpilotInstalledAt', this.installedAt);
+            }
             // Get the current HEAD as our "activation point"
             const currentCommits = yield gitHelper_1.gitHelper.getRecentCommits(workspacePath, 1);
             if (currentCommits.length > 0) {
@@ -65,8 +74,13 @@ class CommitTracker {
             try {
                 // Get recent commits (last 20)
                 const commits = yield gitHelper_1.gitHelper.getRecentCommits(this.workspacePath, 20);
-                // Find new commits (those we haven't tracked yet)
+                // Find new commits (those we haven't tracked yet) made after extension install time.
+                const installedAtMs = Date.parse(this.installedAt);
                 for (const commit of commits) {
+                    const commitDateMs = Date.parse(commit.date || '');
+                    if (!Number.isNaN(installedAtMs) && !Number.isNaN(commitDateMs) && commitDateMs < installedAtMs) {
+                        continue;
+                    }
                     const existing = this.trackedCommits.find(c => c.sha === commit.sha);
                     if (!existing) {
                         // Get files changed in this commit
@@ -75,12 +89,13 @@ class CommitTracker {
                             sha: commit.sha,
                             shortSha: commit.shortSha,
                             message: commit.message,
-                            date: commit.date || new Date().toISOString().split('T')[0],
+                            date: (commit.date || new Date().toISOString()).split('T')[0],
                             files: files,
                             status: 'pending'
                         });
                     }
                 }
+                this.trackedCommits.sort((a, b) => b.date.localeCompare(a.date));
                 // Keep only last 50 commits
                 this.trackedCommits = this.trackedCommits.slice(0, 50);
                 // Save to workspace state
@@ -93,7 +108,7 @@ class CommitTracker {
         });
     }
     getTrackedCommits() {
-        return this.trackedCommits;
+        return [...this.trackedCommits].sort((a, b) => b.date.localeCompare(a.date));
     }
     getCommit(sha) {
         return this.trackedCommits.find(c => c.sha === sha);

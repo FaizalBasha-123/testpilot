@@ -398,7 +398,7 @@ class GitHelper {
             try {
                 const cp = require('child_process');
                 return new Promise((resolve) => {
-                    const command = `git log -n ${limit} --pretty=format:"%H|%h|%s|%ad" --date=short`;
+                    const command = `git log -n ${limit} --pretty=format:"%H|%h|%s|%ad" --date=iso-strict`;
                     cp.exec(command, { cwd: workspacePath }, (err, stdout) => {
                         if (err || !stdout) {
                             resolve([]);

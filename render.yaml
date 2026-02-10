@@ -17,9 +17,13 @@ services:
     healthCheckPath: /health
     envVars:
       - key: AI_CORE_URL
-        value: https://testpilot-ai-core.onrender.com
+        sync: false # Gateway-only on Render: set to your tunneled AI Core base URL
+      - key: AI_REVIEW_WEBHOOK_URL
+        sync: false # Optional explicit webhook URL; defaults to AI_CORE_URL + /api/v1/github_webhooks
       - key: SONAR_SERVICE_URL
-        value: https://testpilot-sonar-scanner.onrender.com
+        sync: false # Gateway-only on Render: set to your tunneled Sonar Scanner base URL
+      - key: ENABLE_MOCK_REVIEW
+        value: "false"
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
       - key: GITHUB_TOKEN
@@ -51,21 +55,27 @@ services:
     healthCheckPath: /health
     envVars:
       - key: SONAR_SERVICE_URL
-        value: https://testpilot-sonar-scanner.onrender.com
+        value: http://testpilot-sonar-scanner:8000
       - key: SONARQUBE__URL
-        sync: false # Set to your self-hosted SonarQube URL
+        value: http://testpilot-sonarqube:9000
       - key: SONARQUBE__TOKEN
         sync: false
       - key: OPENROUTER__KEY
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_EMBEDDING_API_KEY
+        sync: false
+      - key: EMBEDDING_API_BASE
+        sync: false
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
       - key: OPENAI_API_KEY
         sync: false
       - key: CONFIG__MODEL
         value: groq/llama-3.3-70b-versatile
       - key: QDRANT_URL
-        sync: false # Optional: external Qdrant
+        value: http://testpilot-qdrant:6333
       - key: DATABASE_URL
         fromDatabase:
           name: testpilot-db
@@ -91,13 +101,48 @@ services:
     healthCheckPath: /health
     envVars:
       - key: SONARQUBE_URL
-        sync: false # Set to your self-hosted SonarQube URL
+        value: http://testpilot-sonarqube:9000
       - key: SONARQUBE_TOKEN
         sync: false
       - key: SONARQUBE_PASSWORD
         sync: false
       - key: UPLOAD_LIMIT_MB
         value: "1024"
+    autoDeploy: true
+
+  # ============================================
+  # SonarQube (Docker) - Rule Engine
+  # ============================================
+  - type: pserv
+    name: testpilot-sonarqube
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/blackboxtester-mvp
+    branch: main
+    rootDir: services/sonarqube
+    dockerfilePath: Dockerfile
+    plan: standard
+    envVars:
+      - key: SONAR_ES_BOOTSTRAP_CHECKS_DISABLE
+        value: "true"
+      - key: SONAR_ES_JAVA_OPTS
+        value: "-Xms512m -Xmx512m"
+      - key: SONAR_WEB_JAVA_OPTS
+        value: "-Xms512m -Xmx512m"
+      - key: SONAR_CE_JAVA_OPTS
+        value: "-Xms512m -Xmx512m"
+    autoDeploy: true
+
+  # ============================================
+  # Qdrant (Docker) - Vector Database
+  # ============================================
+  - type: pserv
+    name: testpilot-qdrant
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/blackboxtester-mvp
+    branch: main
+    rootDir: services/qdrant
+    dockerfilePath: Dockerfile
+    plan: starter
     autoDeploy: true
 
 # ============================================

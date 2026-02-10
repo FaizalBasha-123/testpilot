@@ -89,7 +89,7 @@
             "properties": {
                 "testpilot.backendUrl": {
                     "type": "string",
-                    "default": "http://localhost:8001",
+                    "default": "https://testpilot-64v5.onrender.com",
                     "description": "URL of the TestPilot backend API"
                 }
             }

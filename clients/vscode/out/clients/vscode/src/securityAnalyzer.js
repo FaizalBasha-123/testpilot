@@ -44,7 +44,7 @@ class SecurityAnalyzer {
                 onUpdate({ status: 'running', findings: [], fixes: [], logs: ['Uploading to analysis server...'] });
                 // Get backend URL
                 const config = vscode.workspace.getConfiguration('testpilot');
-                const backendUrl = config.get('backendUrl', 'http://localhost:8001');
+                const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
                 // Upload for analysis
                 const form = new FormData();
                 form.append('file', content, 'repo.zip');
@@ -141,6 +141,66 @@ class SecurityAnalyzer {
     cancelAnalysis() {
         this._stopPolling();
     }
+    startContextBuild(onProgress) {
+        var _a, _b, _c;
+        return __awaiter(this, void 0, void 0, function* () {
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath) {
+                onProgress({ state: 'failed', percentage: 0, detail: 'No workspace open' });
+                return;
+            }
+            onProgress({ state: 'running', percentage: 5, detail: 'Preparing workspace package' });
+            try {
+                const zip = new JSZip();
+                yield this._addFolderToZip(zip, workspacePath, workspacePath);
+                const content = yield zip.generateAsync({ type: 'nodebuffer' });
+                const config = vscode.workspace.getConfiguration('testpilot');
+                const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+                const form = new FormData();
+                form.append('file', content, 'repo.zip');
+                const submitResponse = yield fetch(`${backendUrl}/api/v1/ide/analyze_unified`, {
+                    method: 'POST',
+                    body: form,
+                    headers: form.getHeaders()
+                });
+                if (!submitResponse.ok) {
+                    throw new Error(`Context build upload failed: ${submitResponse.status} ${submitResponse.statusText}`);
+                }
+                const { job_id } = yield submitResponse.json();
+                onProgress({ state: 'running', percentage: 10, detail: `Context job started (${job_id})` });
+                let finished = false;
+                while (!finished) {
+                    yield new Promise(resolve => setTimeout(resolve, 2000));
+                    const statusResponse = yield fetch(`${backendUrl}/api/v1/ide/job_status/${job_id}`);
+                    if (!statusResponse.ok) {
+                        throw new Error(`Context status failed: ${statusResponse.status} ${statusResponse.statusText}`);
+                    }
+                    const statusData = yield statusResponse.json();
+                    const status = statusData.status || 'pending';
+                    const progress = statusData.progress || {};
+                    const pct = Number(progress.percentage || 0);
+                    const currentFile = progress.current_file || '';
+                    if (status === 'completed') {
+                        onProgress({ state: 'completed', percentage: 100, detail: 'Context graph and embeddings are ready' });
+                        finished = true;
+                    }
+                    else if (status === 'failed') {
+                        const err = ((_c = statusData.result) === null || _c === void 0 ? void 0 : _c.error) || statusData.error || 'Context build failed';
+                        onProgress({ state: 'failed', percentage: Math.max(0, pct), detail: String(err) });
+                        finished = true;
+                    }
+                    else {
+                        const detail = currentFile ? `Processing ${currentFile}` : 'Building context graph and embeddings';
+                        onProgress({ state: 'running', percentage: Math.max(10, pct), detail });
+                    }
+                }
+            }
+            catch (error) {
+                this._outputChannel.appendLine(`[SecurityAnalyzer] Context build error: ${error}`);
+                onProgress({ state: 'failed', percentage: 0, detail: (error === null || error === void 0 ? void 0 : error.message) || String(error) });
+            }
+        });
+    }
     applyFix(fix) {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
@@ -158,6 +218,9 @@ class SecurityAnalyzer {
             if (!workspacePath)
                 return;
             const filePath = path.join(workspacePath, fix.filename);
+            if (!this._stagingManager.isStaged(filePath)) {
+                yield this.applyFix(fix);
+            }
             yield this._stagingManager.acceptChange(filePath);
         });
     }
@@ -168,7 +231,9 @@ class SecurityAnalyzer {
             if (!workspacePath)
                 return;
             const filePath = path.join(workspacePath, fix.filename);
-            yield this._stagingManager.rejectChange(filePath);
+            if (this._stagingManager.isStaged(filePath)) {
+                yield this._stagingManager.rejectChange(filePath);
+            }
         });
     }
     _mapSeverity(severity) {

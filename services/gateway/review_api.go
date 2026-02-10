@@ -57,11 +57,9 @@ func (a *App) handleReviewCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Run mock analysis
-	response := analyzeDiff(req)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	// Mock heuristic review is intentionally disabled.
+	// Clients must use AI-core async analysis endpoints via /api/v1/ide/review_repo_async.
+	http.Error(w, "review-commit endpoint disabled; use /api/v1/ide/review_repo_async for real analysis", http.StatusGone)
 }
 
 // analyzeDiff performs mock heuristic analysis on the diff

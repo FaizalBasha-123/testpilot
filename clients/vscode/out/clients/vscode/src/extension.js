@@ -46,6 +46,9 @@ function activate(context) {
             webviewOptions: { retainContextWhenHidden: true }
         }));
         context.subscriptions.push({ dispose: () => provider.dispose() });
+        // Always bootstrap repository context as soon as extension activates.
+        // This precomputes graph/embedding context in the backend so review latency is lower later.
+        provider.startBackgroundContextBuild();
         // Register CodeLens provider
         context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider));
         outputChannel.appendLine('[TestPilot] Extension activated successfully');

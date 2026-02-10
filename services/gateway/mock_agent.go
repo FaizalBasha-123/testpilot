@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +17,22 @@ import (
 )
 
 func (a *App) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
+	if !a.cfg.EnableMockReview {
+		if a.cfg.AIReviewWebhookURL == "" {
+			http.Error(w, "AI webhook URL is not configured", http.StatusBadGateway)
+			return
+		}
+
+		if err := a.forwardWebhookToAICore(r); err != nil {
+			log.Printf("[webhook-forward] failed: %v", err)
+			http.Error(w, "failed to forward webhook to AI core", http.StatusBadGateway)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
 	payload, err := github.ValidatePayload(r, []byte(a.cfg.GitHubWebhookSecret))
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusUnauthorized)
@@ -33,6 +52,59 @@ func (a *App) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		a.handlePullRequestEvent(w, e)
 	default:
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (a *App) forwardWebhookToAICore(r *http.Request) error {
+	if a.cfg.AIReviewWebhookURL == "" {
+		return errors.New("missing AIReviewWebhookURL")
+	}
+
+	payload, err := io.ReadAll(r.Body)
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+	defer r.Body.Close()
+
+	if len(payload) == 0 {
+		return errors.New("empty webhook payload")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, a.cfg.AIReviewWebhookURL, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create forward request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	copyHeaderIfPresent(r, req, "X-GitHub-Event")
+	copyHeaderIfPresent(r, req, "X-GitHub-Delivery")
+	copyHeaderIfPresent(r, req, "X-Hub-Signature-256")
+	copyHeaderIfPresent(r, req, "User-Agent")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("post to ai-core webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ai-core webhook status=%d body=%q", resp.StatusCode, truncateForLog(string(body), 600))
+	}
+
+	log.Printf(
+		"[webhook-forward] success status=%d event=%s target=%s",
+		resp.StatusCode,
+		r.Header.Get("X-GitHub-Event"),
+		a.cfg.AIReviewWebhookURL,
+	)
+	return nil
+}
+
+func copyHeaderIfPresent(src *http.Request, dst *http.Request, key string) {
+	if v := src.Header.Get(key); strings.TrimSpace(v) != "" {
+		dst.Header.Set(key, v)
 	}
 }
 
@@ -96,7 +168,7 @@ func (a *App) runMockAgent(owner, repo string, installationID int64) error {
 		return err
 	}
 
-	branchName := fmt.Sprintf("ai-fix-optimization-%d", time.Now().Unix())
+	branchName := fmt.Sprintf("TestPilot-PR-Agent-%d", time.Now().Unix())
 	newRef := &github.Reference{
 		Ref: github.String("refs/heads/" + branchName),
 		Object: &github.GitObject{

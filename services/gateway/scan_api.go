@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -50,15 +52,19 @@ type FixProposal struct {
 }
 
 func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[gateway-upload] incoming request method=%s path=%s remote=%s content_length=%d", r.Method, r.URL.Path, r.RemoteAddr, r.ContentLength)
+
 	// Parse multipart form
 	err := r.ParseMultipartForm(50 << 20) // 50 MB max
 	if err != nil {
+		log.Printf("[gateway-upload] parse form failed: %v", err)
 		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
+		log.Printf("[gateway-upload] missing file field: %v", err)
 		http.Error(w, "Missing 'file' in form data", http.StatusBadRequest)
 		return
 	}
@@ -72,6 +78,7 @@ func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
 	tempPath := filepath.Join(tempDir, jobID+".zip")
 	outFile, err := os.Create(tempPath)
 	if err != nil {
+		log.Printf("[gateway-upload:%s] failed to create temp file %s: %v", jobID, tempPath, err)
 		http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
 		return
 	}
@@ -79,9 +86,11 @@ func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
 
 	_, err = io.Copy(outFile, file)
 	if err != nil {
+		log.Printf("[gateway-upload:%s] failed to persist uploaded file: %v", jobID, err)
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("[gateway-upload:%s] upload accepted filename=%s size=%d temp_path=%s", jobID, header.Filename, header.Size, tempPath)
 
 	// Initialize Job
 	job := &ScanJob{
@@ -98,6 +107,7 @@ func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
 	// Respond immediately
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"job_id": jobID})
+	log.Printf("[gateway-upload:%s] queued async processing", jobID)
 
 	// Start Async Processing
 	go app.processScanJob(jobID, tempPath)
@@ -147,7 +157,7 @@ func (app *App) handleCancelJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) processScanJob(jobID string, zipPath string) {
-	defer os.Remove(zipPath) // Cleanup
+	defer os.Remove(zipPath) // Cleanup local temp zip
 
 	// Helper to update status
 	update := func(status string, msg string) {
@@ -161,42 +171,160 @@ func (app *App) processScanJob(jobID string, zipPath string) {
 		jobsMut.Unlock()
 	}
 
-	update("running", "Unzipping workspace...")
-	time.Sleep(1 * time.Second)
+	update("running", "Forwarding to AI Core...")
 
-	update("running", "Analyzing project structure...")
-	time.Sleep(1 * time.Second)
-
-	update("running", "Running SonarQube rules (Mock)...")
-	time.Sleep(2 * time.Second)
-
-	// Mock Findings
-	sonarIssues := []SonarIssue{
-		{File: "services/git-app-backend/main.go", Line: 45, Severity: "HIGH", Message: "Hardcoded secret detected", Rule: "S1234"},
-		{File: "clients/vscode/src/extension.ts", Line: 10, Severity: "MEDIUM", Message: "Cognitive Complexity is too high", Rule: "S3456"},
+	// 1. Forward ZIP to AI Core
+	aiCoreURL := os.Getenv("AI_CORE_URL")
+	if strings.TrimSpace(app.cfg.AICoreURL) != "" {
+		aiCoreURL = app.cfg.AICoreURL
 	}
-
-	update("running", fmt.Sprintf("Found %d issues. Generating AI fixes...", len(sonarIssues)))
-	time.Sleep(2 * time.Second)
-
-	// Mock Fixes
-	fixes := []FixProposal{
-		{
-			Filename:        "services/git-app-backend/main.go",
-			OriginalContent: "secret := \"hardcoded-value\"",
-			NewContent:      "secret := os.Getenv(\"MY_SECRET\")",
-			UnifiedDiff:     "",
-		},
+	if aiCoreURL == "" {
+		aiCoreURL = "http://ai-core:3000"
 	}
+	log.Printf("[gateway-job:%s] forwarding zip=%s to ai_core=%s", jobID, zipPath, aiCoreURL)
 
-	jobsMut.Lock()
-	if j, ok := jobs[jobID]; ok {
-		j.Status = "completed"
-		j.Result = &ScanResult{
-			SonarData: sonarIssues,
-			Fixes:     fixes,
+	// Stream uploaded ZIP to AI Core to avoid buffering large files in memory.
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		// Add file
+		part, err := writer.CreateFormFile("file", "repo.zip")
+		if err != nil {
+			log.Printf("[gateway-job:%s] failed to create multipart form field: %v", jobID, err)
+			return
 		}
-		j.Logs = append(j.Logs, "Analysis complete.")
+
+		zipFile, err := os.Open(zipPath)
+		if err != nil {
+			log.Printf("[gateway-job:%s] failed to open zip for forwarding: %v", jobID, err)
+			return
+		}
+		defer zipFile.Close()
+
+		if _, err := io.Copy(part, zipFile); err != nil {
+			log.Printf("[gateway-job:%s] failed to stream zip to multipart writer: %v", jobID, err)
+		}
+	}()
+
+	targetURL := aiCoreURL + "/api/v1/ide/review_repo_async"
+	req, err := http.NewRequest("POST", targetURL, pr)
+	if err != nil {
+		log.Printf("[gateway-job:%s] failed to build request to ai-core: %v", jobID, err)
+		update("failed", "Failed to create request: "+err.Error())
+		return
 	}
-	jobsMut.Unlock()
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Request-ID", jobID)
+	log.Printf("[gateway-job:%s] POST %s", jobID, targetURL)
+
+	client := &http.Client{Timeout: 0} // No timeout for upload? Maybe 5 mins
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[gateway-job:%s] ai-core unreachable: %v", jobID, err)
+		update("failed", "AI Core unreachable: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	log.Printf("[gateway-job:%s] ai-core enqueue response status=%d", jobID, resp.StatusCode)
+
+	if resp.StatusCode != 200 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		respSnippet := truncateForLog(string(bodyBytes), 800)
+		log.Printf("[gateway-job:%s] ai-core enqueue failed status=%d body=%q", jobID, resp.StatusCode, respSnippet)
+		if resp.StatusCode == http.StatusNotFound {
+			log.Printf("[gateway-job:%s] ai-core returned 404 for %s (endpoint missing or app route not mounted)", jobID, targetURL)
+		}
+		update("failed", fmt.Sprintf("AI Core Error (%d): %s", resp.StatusCode, string(bodyBytes)))
+		return
+	}
+
+	var aiResp map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
+		log.Printf("[gateway-job:%s] invalid json from ai-core enqueue: %v", jobID, err)
+		update("failed", "Invalid response from AI Core")
+		return
+	}
+
+	aiJobID := aiResp["job_id"]
+	log.Printf("[gateway-job:%s] ai-core accepted job ai_job_id=%s", jobID, aiJobID)
+	update("running", fmt.Sprintf("AI Job Started (ID: %s). Polling...", aiJobID))
+
+	// 2. Poll AI Core for Completion
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	timeout := time.After(10 * time.Minute)
+
+	for {
+		select {
+		case <-timeout:
+			update("failed", "Analysis timed out")
+			return
+		case <-ticker.C:
+			// check status
+			statusURL := fmt.Sprintf("%s/api/v1/ide/job_status/%s", aiCoreURL, aiJobID)
+			statusReq, _ := http.NewRequest("GET", statusURL, nil)
+			statusReq.Header.Set("X-Request-ID", jobID)
+			statusResp, err := client.Do(statusReq)
+			if err != nil {
+				log.Printf("[gateway-job:%s] ai-core poll request failed: %v", jobID, err)
+				continue // retry
+			}
+
+			var data struct {
+				Status string      `json:"status"`
+				Logs   []string    `json:"logs"`
+				Result *ScanResult `json:"result,omitempty"`
+				Error  string      `json:"error,omitempty"`
+			}
+			if err := json.NewDecoder(statusResp.Body).Decode(&data); err != nil {
+				log.Printf("[gateway-job:%s] failed to decode poll response from %s status=%d error=%v", jobID, statusURL, statusResp.StatusCode, err)
+			}
+			statusResp.Body.Close()
+
+			// Sync Logs
+			jobsMut.Lock()
+			if j, ok := jobs[jobID]; ok {
+				// Naive log sync: just replace or append new ones?
+				// Let's just take the last log from AI Core if it's new
+				if len(data.Logs) > 0 {
+					lastLog := data.Logs[len(data.Logs)-1]
+					if len(j.Logs) == 0 || j.Logs[len(j.Logs)-1] != lastLog {
+						j.Logs = append(j.Logs, lastLog)
+					}
+				}
+				j.Status = data.Status
+				log.Printf("[gateway-job:%s] poll status=%s ai_job_id=%s", jobID, data.Status, aiJobID)
+
+				if data.Status == "completed" {
+					j.Result = data.Result
+					log.Printf("[gateway-job:%s] completed successfully", jobID)
+					jobsMut.Unlock()
+					return // Done
+				}
+				if data.Status == "failed" {
+					j.Error = data.Error
+					log.Printf("[gateway-job:%s] failed ai_job_id=%s error=%q", jobID, aiJobID, data.Error)
+					jobsMut.Unlock()
+					return // Done
+				}
+			} else {
+				jobsMut.Unlock()
+				return // Job killed locally?
+			}
+			jobsMut.Unlock()
+		}
+	}
+}
+
+func truncateForLog(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "...(truncated)"
 }

@@ -34,13 +34,15 @@ services:
       - sonar_logs:/opt/sonarqube/logs
       - sonar_extensions:/opt/sonarqube/extensions
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/api/system/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/api/system/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
     restart: unless-stopped
     mem_limit: 2g
+    networks:
+      - testpilot-network
 
   # ----------------------------------------------------------
   # PostgreSQL - User & Credit Database
@@ -62,6 +64,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - testpilot-network
 
   # ----------------------------------------------------------
   # Redis - Caching & Job Queue
@@ -79,6 +83,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - testpilot-network
 
   # ----------------------------------------------------------
   # SERVICE 1: Sonar Scanner (Static Analysis)
@@ -97,10 +103,16 @@ services:
       - UPLOAD_LIMIT_MB=${UPLOAD_LIMIT_MB:-1024}
     volumes:
       - /tmp/sonar_uploads:/tmp/sonar_uploads
+    healthcheck:
+      test: ["CMD-SHELL", "(wget -S --spider http://localhost:8000/analyze 2>&1 || true) | grep -q \"HTTP/\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     mem_limit: 4g
     restart: unless-stopped
     networks:
-      - default
+      - testpilot-network
 
   # ----------------------------------------------------------
   # SERVICE 2: AI Core (Review Engine, Context, Model Adapters)
@@ -117,26 +129,45 @@ services:
       - SONAR_SERVICE_URL=http://sonar-scanner:8000
       - OPENROUTER__KEY=${OPENROUTER_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_EMBEDDING_API_KEY=${GROQ_EMBEDDING_API_KEY}
+      - EMBEDDING_API_BASE=${EMBEDDING_API_BASE}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
       - CONFIG__MODEL=groq/llama-3.3-70b-versatile
       - SONARQUBE__ENABLED=true
       - SONARQUBE__URL=http://sonarqube:9000
       - SONARQUBE__TOKEN=${SONARQUBE_TOKEN}
-      - DATABASE_URL=postgresql://testpilot:${POSTGRES_PASSWORD:-testpilot_dev}@postgres:5432/testpilot
+      - DATABASE_URL=postgresql://testpilot:${POSTGRES_PASSWORD:-testpilot_dev}@postgres:5432/testpilot?sslmode=disable
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
     depends_on:
       - sonar-scanner
       - sonarqube
       - postgres
       - redis
+      - qdrant
     volumes:
       - ./services/ai-core/pr_agent:/app/pr_agent  # Hot Reload
       - /tmp/testpilot:/tmp/testpilot
     restart: unless-stopped
     networks:
-      - default
+      - testpilot-network
 
   # ----------------------------------------------------------
-  # SERVICE 3: Gateway (HTTP Gateway, Auth, Webhooks)
+  # SERVICE 3: Qdrant (Vector Database for Embeddings)
+  # ----------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: testpilot-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    networks:
+      - testpilot-network
+
+  # ----------------------------------------------------------
+  # SERVICE 4: Gateway (HTTP Gateway, Auth, Webhooks)
   # ----------------------------------------------------------
   gateway:
     build:
@@ -144,10 +175,11 @@ services:
       dockerfile: Dockerfile
     container_name: testpilot-gateway
     ports:
-      - "3001:3000"
+      - "3001:8001"
     environment:
       - AI_CORE_URL=http://ai-core:3000
       - SONAR_SERVICE_URL=http://sonar-scanner:8000
+      - DATABASE_URL=postgresql://testpilot:${POSTGRES_PASSWORD:-testpilot_dev}@postgres:5432/testpilot?sslmode=disable
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - QUALITY_GATE_THRESHOLD=${QUALITY_GATE_THRESHOLD:-0}
@@ -156,7 +188,7 @@ services:
       - sonar-scanner
     restart: unless-stopped
     networks:
-      - default
+      - testpilot-network
 
 volumes:
   sonar_data:
@@ -164,7 +196,9 @@ volumes:
   sonar_extensions:
   postgres_data:
   redis_data:
+  qdrant_data:
 
 networks:
-  default:
-    name: testpilot-network
+  testpilot-network:
+    driver: bridge
+

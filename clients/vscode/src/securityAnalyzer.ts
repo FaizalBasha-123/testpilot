@@ -32,6 +32,7 @@ export interface AnalysisResult {
 }
 
 type AnalysisCallback = (result: AnalysisResult) => void;
+type ContextProgressCallback = (progress: { state: string; percentage: number; detail: string }) => void;
 
 /**
  * Handles security analysis: zip → upload → poll → fixes
@@ -66,7 +67,7 @@ export class SecurityAnalyzer {
 
             // Get backend URL
             const config = vscode.workspace.getConfiguration('testpilot');
-            const backendUrl = config.get('backendUrl', 'http://localhost:8001');
+            const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
 
             // Upload for analysis
             const form = new FormData();
@@ -176,6 +177,72 @@ export class SecurityAnalyzer {
         this._stopPolling();
     }
 
+    async startContextBuild(onProgress: ContextProgressCallback): Promise<void> {
+        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspacePath) {
+            onProgress({ state: 'failed', percentage: 0, detail: 'No workspace open' });
+            return;
+        }
+
+        onProgress({ state: 'running', percentage: 5, detail: 'Preparing workspace package' });
+
+        try {
+            const zip = new JSZip();
+            await this._addFolderToZip(zip, workspacePath, workspacePath);
+            const content = await zip.generateAsync({ type: 'nodebuffer' });
+
+            const config = vscode.workspace.getConfiguration('testpilot');
+            const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+
+            const form = new FormData();
+            form.append('file', content, 'repo.zip');
+
+            const submitResponse = await fetch(`${backendUrl}/api/v1/ide/analyze_unified`, {
+                method: 'POST',
+                body: form,
+                headers: form.getHeaders()
+            });
+
+            if (!submitResponse.ok) {
+                throw new Error(`Context build upload failed: ${submitResponse.status} ${submitResponse.statusText}`);
+            }
+
+            const { job_id } = await submitResponse.json();
+            onProgress({ state: 'running', percentage: 10, detail: `Context job started (${job_id})` });
+
+            let finished = false;
+            while (!finished) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const statusResponse = await fetch(`${backendUrl}/api/v1/ide/job_status/${job_id}`);
+                if (!statusResponse.ok) {
+                    throw new Error(`Context status failed: ${statusResponse.status} ${statusResponse.statusText}`);
+                }
+
+                const statusData = await statusResponse.json();
+                const status = statusData.status || 'pending';
+                const progress = statusData.progress || {};
+                const pct = Number(progress.percentage || 0);
+                const currentFile = progress.current_file || '';
+
+                if (status === 'completed') {
+                    onProgress({ state: 'completed', percentage: 100, detail: 'Context graph and embeddings are ready' });
+                    finished = true;
+                } else if (status === 'failed') {
+                    const err = statusData.result?.error || statusData.error || 'Context build failed';
+                    onProgress({ state: 'failed', percentage: Math.max(0, pct), detail: String(err) });
+                    finished = true;
+                } else {
+                    const detail = currentFile ? `Processing ${currentFile}` : 'Building context graph and embeddings';
+                    onProgress({ state: 'running', percentage: Math.max(10, pct), detail });
+                }
+            }
+        } catch (error: any) {
+            this._outputChannel.appendLine(`[SecurityAnalyzer] Context build error: ${error}`);
+            onProgress({ state: 'failed', percentage: 0, detail: error?.message || String(error) });
+        }
+    }
+
     async applyFix(fix: FixProposal): Promise<void> {
         const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!workspacePath) return;
@@ -189,6 +256,9 @@ export class SecurityAnalyzer {
         if (!workspacePath) return;
 
         const filePath = path.join(workspacePath, fix.filename);
+        if (!this._stagingManager.isStaged(filePath)) {
+            await this.applyFix(fix);
+        }
         await this._stagingManager.acceptChange(filePath);
     }
 
@@ -197,7 +267,9 @@ export class SecurityAnalyzer {
         if (!workspacePath) return;
 
         const filePath = path.join(workspacePath, fix.filename);
-        await this._stagingManager.rejectChange(filePath);
+        if (this._stagingManager.isStaged(filePath)) {
+            await this._stagingManager.rejectChange(filePath);
+        }
     }
 
     private _mapSeverity(severity: string): SecurityFinding['severity'] {
@@ -240,3 +312,4 @@ export class SecurityAnalyzer {
         this._stopPolling();
     }
 }
+

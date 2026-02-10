@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, Request
 from pydantic import BaseModel
 import tempfile
 import os
@@ -14,6 +14,7 @@ import json
 import asyncio
 import re
 import aiohttp
+import time
 
 # Code Graph v2 - Multi-language dependency analyzer
 from pr_agent.algo.code_graph import build_codegraph_v2, CodeGraphBuilder
@@ -102,6 +103,70 @@ router = APIRouter()
 class IDEReviewRequest(BaseModel):
     file_path: str
     content: str
+
+
+def _trace_headers(request: Request) -> dict:
+    return {
+        "x_request_id": request.headers.get("x-request-id", ""),
+        "content_type": request.headers.get("content-type", ""),
+        "content_length": request.headers.get("content-length", ""),
+        "user_agent": request.headers.get("user-agent", ""),
+    }
+
+@router.post("/api/v1/ide/review_repo_async")
+async def review_repo_async(
+    request: Request,
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Async Endpoint: Accepts a ZIP of the repo, starts analysis in background.
+    Returns: {"job_id": "uuid"}
+    """
+    trace = _trace_headers(request)
+    get_logger().info(
+        "[ide-review-async:v1] received upload",
+        artifact={"trace": trace, "filename": file.filename},
+    )
+
+    job_id = str(uuid.uuid4())
+    JOBS[job_id] = {
+        "status": "pending",
+        "logs": ["Job Queued..."],
+        "progress": {"current_file": "Uploading...", "processed": 0, "total": 0},
+        "created_at": time.time()
+    }
+    
+    # Save Uploaded Zip
+    temp_dir = tempfile.mkdtemp(prefix="blackbox_scan_")
+    zip_path = os.path.join(temp_dir, "repo.zip")
+    
+    get_logger().info(f"Job {job_id}: Receiving ZIP...")
+    
+    with open(zip_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    get_logger().info(
+        f"[ide-review-async:v1] job={job_id} persisted zip bytes={len(content)} path={zip_path}"
+    )
+        
+    JOBS[job_id]["logs"].append(f"ZIP received ({len(content)} bytes)")
+    
+    # Start Background Task
+    if background_tasks:
+        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir)
+    else:
+        get_logger().warning(f"[ide-review-async:v1] job={job_id} missing background_tasks; task will not start")
+        
+    return {"job_id": job_id}
+
+@router.get("/api/v1/ide/job_status/{job_id}")
+async def get_job_status(job_id: str):
+    if job_id not in JOBS:
+        get_logger().warning(f"[ide-job-status:v1] job not found job_id={job_id}")
+        return {"status": "not_found"}
+    get_logger().debug(f"[ide-job-status:v1] job status request job_id={job_id} status={JOBS[job_id].get('status')}")
+    return JOBS[job_id]
 
 @router.post("/api/v1/ide/review")
 async def review_ide_file(
@@ -960,11 +1025,23 @@ Return ONLY valid JSON with the fixed code for this snippet:
 
 @router.post("/api/v1/ide/review_repo_async")
 async def review_repo_async(
+    request: Request,
     file: UploadFile = File(...),
     git_log: str = Form(None),
     git_diff: str = Form(None),
     background_tasks: BackgroundTasks = None
 ):
+    trace = _trace_headers(request)
+    get_logger().info(
+        "[ide-review-async:v2] received upload",
+        artifact={
+            "trace": trace,
+            "filename": file.filename,
+            "has_git_log": bool(git_log),
+            "has_git_diff": bool(git_diff),
+        },
+    )
+
     job_id = str(uuid.uuid4())
     temp_dir = os.path.join("/tmp", f"blackbox_repo_{os.urandom(4).hex()}")
     os.makedirs(temp_dir, exist_ok=True)
@@ -972,16 +1049,26 @@ async def review_repo_async(
     zip_path = os.path.join(temp_dir, "repo.zip")
     with open(zip_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+    zip_size = os.path.getsize(zip_path)
+    get_logger().info(
+        f"[ide-review-async:v2] job={job_id} persisted zip bytes={zip_size} path={zip_path}"
+    )
         
     JOBS[job_id] = {"status": "pending", "logs": [], "result": None}
-    background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir, git_log, git_diff)
+    if background_tasks:
+        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir, git_log, git_diff)
+        get_logger().info(f"[ide-review-async:v2] job={job_id} background task scheduled")
+    else:
+        get_logger().warning(f"[ide-review-async:v2] job={job_id} missing background_tasks; task will not start")
     
     return {"job_id": job_id, "status": "pending"}
 
 @router.get("/api/v1/ide/job_status/{job_id}")
 async def get_job_status(job_id: str):
     if job_id not in JOBS:
+        get_logger().warning(f"[ide-job-status:v2] job not found job_id={job_id}")
         return {"status": "not_found"}
+    get_logger().debug(f"[ide-job-status:v2] job status request job_id={job_id} status={JOBS[job_id].get('status')}")
     return JOBS[job_id]
 
 @router.post("/api/v1/ide/cancel/{job_id}")

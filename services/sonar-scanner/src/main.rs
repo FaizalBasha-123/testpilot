@@ -2,7 +2,7 @@ use axum::{
     extract::Multipart,
     http::StatusCode,
     response::{IntoResponse, Json, Response},
-    routing::post,
+    routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -118,6 +118,8 @@ async fn main() {
 
     // Build our application with routes
     let app = Router::new()
+        .route("/", get(root_handler))
+        .route("/health", get(health_handler))
         .route("/analyze", post(analyze_handler))
         .layer(
             tower_http::cors::CorsLayer::permissive()
@@ -133,6 +135,14 @@ async fn main() {
     axum::serve(listener, app)
         .await
         .expect("Server failed to start");
+}
+
+async fn root_handler() -> &'static str {
+    "ok"
+}
+
+async fn health_handler() -> &'static str {
+    "ok"
 }
 
 async fn analyze_handler(mut multipart: Multipart) -> Result<Json<AnalyzeResponse>, AppError> {

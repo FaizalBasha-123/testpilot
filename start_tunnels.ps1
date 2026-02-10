@@ -1,79 +1,158 @@
-# Start-Tunnels.ps1
-# Automates Cloudflare Tunnel setup for Blackbox Tester
+# start_tunnels.ps1
+# Starts Cloudflare tunnels for local services and writes tunnel.md with env vars.
 
-Write-Host "🚀 Starting Blackbox Tester Tunnels..." -ForegroundColor Cyan
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
-# 1. Kill existing tunnels
-Write-Host "Stopping old tunnels..."
+Write-Host "Starting tunnels for ai-core, sonar-scanner, and sonarqube..."
+
+function Resolve-CloudflaredPath {
+    $candidates = @(
+        "cloudflared",
+        "C:\Program Files\Cloudflare\Cloudflared\cloudflared.exe",
+        "C:\Program Files (x86)\cloudflared\cloudflared.exe"
+    )
+
+    foreach ($candidate in $candidates) {
+        try {
+            $cmd = Get-Command $candidate -ErrorAction Stop
+            if ($cmd -and $cmd.Source) {
+                return $cmd.Source
+            }
+        } catch {
+            # try next
+        }
+    }
+
+    throw "cloudflared executable not found. Install cloudflared or add it to PATH."
+}
+
+function Start-TunnelJob {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$LocalUrl,
+        [Parameter(Mandatory = $true)][string]$CloudflaredPath
+    )
+
+    $logFile = Join-Path (Get-Location) ("tunnel_{0}.log" -f $Name)
+    if (Test-Path $logFile) {
+        Remove-Item $logFile -Force
+    }
+
+    Start-Job -Name ("tunnel_{0}" -f $Name) -ScriptBlock {
+        param($ExePath, $TargetUrl, $OutFile)
+        & $ExePath tunnel --url $TargetUrl *> $OutFile
+    } -ArgumentList $CloudflaredPath, $LocalUrl, $logFile | Out-Null
+
+    return $logFile
+}
+
+function Get-TunnelUrlFromLog {
+    param(
+        [Parameter(Mandatory = $true)][string]$LogPath
+    )
+
+    if (-not (Test-Path $LogPath)) {
+        return $null
+    }
+
+    $content = Get-Content -Path $LogPath -Raw -ErrorAction SilentlyContinue
+    if (-not $content) {
+        return $null
+    }
+
+    $match = [regex]::Match($content, "https://[a-zA-Z0-9-]+\.trycloudflare\.com")
+    if ($match.Success) {
+        return $match.Value.TrimEnd("/")
+    }
+    return $null
+}
+
+# Service-to-local-port mapping.
+$serviceMap = @(
+    @{ Name = "ai_core";       LocalUrl = "http://localhost:3000" },
+    @{ Name = "sonar_scanner"; LocalUrl = "http://localhost:8001" },
+    @{ Name = "sonarqube";     LocalUrl = "http://localhost:9000" }
+)
+
+$cloudflared = Resolve-CloudflaredPath
+Write-Host ("Using cloudflared: {0}" -f $cloudflared)
+
+# Stop previous cloudflared and tunnel jobs to avoid stale URLs.
+Get-Job -Name "tunnel_*" -ErrorAction SilentlyContinue | Stop-Job -ErrorAction SilentlyContinue
+Get-Job -Name "tunnel_*" -ErrorAction SilentlyContinue | Remove-Job -Force -ErrorAction SilentlyContinue
 Stop-Process -Name cloudflared -ErrorAction SilentlyContinue
 
-# 2. Start Bot Tunnel (Port 8001)
-Write-Host "Starting Bot Tunnel (Port 8001)..."
-Start-Job -ScriptBlock {
-    & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:8001 > tunnel_bot.txt 2>&1
-} | Out-Null
-
-# 3. Start Auth Tunnel (Port 8000)
-Write-Host "Starting Auth Tunnel (Port 8000)..."
-Start-Job -ScriptBlock {
-    & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:8000 > tunnel_auth.txt 2>&1
-} | Out-Null
-
-Write-Host "Waiting 10s for tunnels to stabilize..." -ForegroundColor Yellow
-Start-Sleep -Seconds 10
-
-# 4. Extract URLs
-$botContent = Get-Content -Path "tunnel_bot.txt" -Raw -ErrorAction SilentlyContinue
-$authContent = Get-Content -Path "tunnel_auth.txt" -Raw -ErrorAction SilentlyContinue
-
-$botUrl = $null
-$authUrl = $null
-
-if ($botContent -match "https://[a-zA-Z0-9-]+\.trycloudflare\.com") {
-    $botUrl = $matches[0]
-}
-if ($authContent -match "https://[a-zA-Z0-9-]+\.trycloudflare\.com") {
-    $authUrl = $matches[0]
+$logs = @{}
+foreach ($svc in $serviceMap) {
+    Write-Host ("Starting tunnel {0} -> {1}" -f $svc.Name, $svc.LocalUrl)
+    $logs[$svc.Name] = Start-TunnelJob -Name $svc.Name -LocalUrl $svc.LocalUrl -CloudflaredPath $cloudflared
 }
 
-if (-not $botUrl -or -not $authUrl) {
-    Write-Error "Failed to get URLs. Check tunnel_bot.txt or tunnel_auth.txt."
+# Wait for URLs to appear in logs.
+$deadline = (Get-Date).AddSeconds(45)
+$urls = @{}
+while ((Get-Date) -lt $deadline) {
+    foreach ($svc in $serviceMap) {
+        if (-not $urls.ContainsKey($svc.Name)) {
+            $url = Get-TunnelUrlFromLog -LogPath $logs[$svc.Name]
+            if ($url) {
+                $urls[$svc.Name] = $url
+            }
+        }
+    }
+
+    if ($urls.Count -eq $serviceMap.Count) {
+        break
+    }
+
+    Start-Sleep -Milliseconds 800
+}
+
+if ($urls.Count -ne $serviceMap.Count) {
+    Write-Host "Failed to fetch all tunnel URLs. Check log files:" -ForegroundColor Red
+    foreach ($svc in $serviceMap) {
+        Write-Host ("  {0}: {1}" -f $svc.Name, $logs[$svc.Name])
+    }
     exit 1
 }
 
-Write-Host "`n✅ Tunnels Active!" -ForegroundColor Green
-Write-Host "---------------------------------------------------"
-Write-Host "Bot URL (Webhooks): $botUrl" -ForegroundColor Cyan
-Write-Host "Auth URL (Login):   $authUrl" -ForegroundColor Cyan
-Write-Host "---------------------------------------------------`n"
+$aiCoreUrl = $urls["ai_core"]
+$sonarScannerUrl = $urls["sonar_scanner"]
+$sonarqubeUrl = $urls["sonarqube"]
 
-# 5. Update Frontend (Login Page)
-$loginPagePath = "clients/web-dashboard/app/auth/login/page.tsx"
-Write-Host "Updating Frontend Login Page ($loginPagePath)..."
-$loginContent = Get-Content $loginPagePath -Raw
-# Replace any existing trycloudflare URL or localhost with new Auth URL
-$loginContent = $loginContent -replace 'https://[a-zA-Z0-9-]+\.trycloudflare\.com/auth/login', "$authUrl/auth/login"
-$loginContent = $loginContent -replace 'http://localhost:8000/auth/login', "$authUrl/auth/login"
-Set-Content -Path $loginPagePath -Value $loginContent
+$envLines = @(
+    ("AI_CORE_URL={0}" -f $aiCoreUrl),
+    ("AI_REVIEW_WEBHOOK_URL={0}/api/v1/github_webhooks" -f $aiCoreUrl),
+    ("SONAR_SERVICE_URL={0}" -f $sonarScannerUrl),
+    ("SONARQUBE__URL={0}" -f $sonarqubeUrl),
+    ("SONARQUBE_URL={0}" -f $sonarqubeUrl),
+    "ENABLE_MOCK_REVIEW=false"
+)
 
-# 6. Update Backend (.env) - PUBLIC_API_URL
-$backendEnvPath = "services/platform-backend/.env"
-Write-Host "Updating Backend .env ($backendEnvPath)..."
-$envContent = Get-Content $backendEnvPath -Raw
-if ($envContent -match "PUBLIC_API_URL=") {
-    $envContent = $envContent -replace "PUBLIC_API_URL=.*", "PUBLIC_API_URL=`"$authUrl`""
-} else {
-    $envContent += "`nPUBLIC_API_URL=`"$authUrl`""
+$tunnelMdPath = Join-Path (Get-Location) "tunnel.md"
+$doc = @()
+$doc += "# Tunnel Environment Variables"
+$doc += "# Generated by start_tunnels.ps1 at $(Get-Date -Format s)"
+$doc += ""
+$doc += "```env"
+$doc += $envLines
+$doc += "```"
+$doc += ""
+$doc += "# Raw key=value"
+$doc += $envLines
+
+# Replace previous file content every run.
+Set-Content -Path $tunnelMdPath -Value ($doc -join "`r`n")
+
+Write-Host ""
+Write-Host "Tunnels are active and tunnel.md has been replaced with fresh values." -ForegroundColor Green
+Write-Host ""
+foreach ($line in $envLines) {
+    Write-Host $line
 }
-Set-Content -Path $backendEnvPath -Value $envContent
-
-Write-Host "✅ Codebase updated with new URLs." -ForegroundColor Green
-
-# 7. Instructions
-Write-Host "`n⚠️  MANUAL ACTION REQUIRED ⚠️" -ForegroundColor Yellow
-Write-Host "Go to GitHub App Settings -> General -> Webhook URL:"
-Write-Host "  $botUrl/api/v1/github_webhooks" -ForegroundColor White
-Write-Host "`nGo to GitHub App Settings -> Identifying users -> Callback URL:"
-Write-Host "  $authUrl/auth/callback/github" -ForegroundColor White
-
-Write-Host "`n(Restart your backend services if they don't auto-reload)"
+Write-Host ""
+Write-Host "Log files:"
+foreach ($svc in $serviceMap) {
+    Write-Host ("  {0}: {1}" -f $svc.Name, $logs[$svc.Name])
+}

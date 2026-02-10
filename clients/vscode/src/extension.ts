@@ -47,6 +47,10 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push({ dispose: () => provider.dispose() });
 
+    // Always bootstrap repository context as soon as extension activates.
+    // This precomputes graph/embedding context in the backend so review latency is lower later.
+    provider.startBackgroundContextBuild();
+
     // Register CodeLens provider
     context.subscriptions.push(
         vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,6 +23,10 @@ type Config struct {
 	FrontendURL         string
 	BackendURL          string
 	GitHubAppInstallURL string
+	AIReviewWebhookURL  string
+	AICoreURL           string
+	SonarServiceURL     string
+	EnableMockReview    bool
 }
 
 type App struct {
@@ -32,6 +37,14 @@ type App struct {
 
 func main() {
 	cfg := loadConfig()
+	log.Printf(
+		"config: mock_review=%t ai_core_url=%q ai_webhook_url=%q sonar_service_url=%q",
+		cfg.EnableMockReview,
+		cfg.AICoreURL,
+		cfg.AIReviewWebhookURL,
+		cfg.SonarServiceURL,
+	)
+
 	db, err := initDB(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("db init failed: %v", err)
@@ -65,19 +78,39 @@ func main() {
 	// Serve static frontend files (catch-all must be last)
 	mux.HandleFunc("/", app.spaHandler(staticDir))
 
+	listenAddr := resolveListenAddr()
+
 	server := &http.Server{
-		Addr:              ":8001",
+		Addr:              listenAddr,
 		Handler:           withCORS(mux),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	log.Println("git-app-backend listening on :8001")
+	log.Printf("git-app-backend listening on %s", listenAddr)
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
 
+func resolveListenAddr() string {
+	port := strings.TrimSpace(os.Getenv("PORT"))
+	if port == "" {
+		port = "8001"
+	}
+
+	if _, err := strconv.Atoi(port); err != nil {
+		log.Printf("invalid PORT=%q, falling back to 8001", port)
+		port = "8001"
+	}
+
+	return ":" + port
+}
+
 func loadConfig() Config {
+	aiCoreURL := normalizeBaseURL(os.Getenv("AI_CORE_URL"))
+	aiReviewWebhookURL := resolveAIWebhookURL(os.Getenv("AI_REVIEW_WEBHOOK_URL"), aiCoreURL)
+	sonarServiceURL := normalizeBaseURL(os.Getenv("SONAR_SERVICE_URL"))
+
 	return Config{
 		GitHubClientID:      os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret:  os.Getenv("GITHUB_CLIENT_SECRET"),
@@ -90,7 +123,37 @@ func loadConfig() Config {
 		FrontendURL:         os.Getenv("FRONTEND_URL"),
 		BackendURL:          os.Getenv("BACKEND_URL"),
 		GitHubAppInstallURL: os.Getenv("GITHUB_APP_INSTALL_URL"),
+		AIReviewWebhookURL:  aiReviewWebhookURL,
+		AICoreURL:           aiCoreURL,
+		SonarServiceURL:     sonarServiceURL,
+		EnableMockReview:    parseBoolEnv("ENABLE_MOCK_REVIEW", false),
 	}
+}
+
+func normalizeBaseURL(raw string) string {
+	clean := strings.TrimSpace(raw)
+	if clean == "" {
+		return ""
+	}
+	if !strings.HasPrefix(clean, "http://") && !strings.HasPrefix(clean, "https://") {
+		clean = "https://" + clean
+	}
+	return strings.TrimRight(clean, "/")
+}
+
+func resolveAIWebhookURL(explicitURL, aiCoreURL string) string {
+	explicit := normalizeBaseURL(explicitURL)
+	if explicit != "" {
+		if strings.Contains(explicit, "/api/v1/github_webhooks") {
+			return explicit
+		}
+		return explicit + "/api/v1/github_webhooks"
+	}
+
+	if aiCoreURL == "" {
+		return ""
+	}
+	return aiCoreURL + "/api/v1/github_webhooks"
 }
 
 func mustInt64(name string) int64 {

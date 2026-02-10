@@ -6,9 +6,9 @@ import { useEffect, useState } from 'react';
 
 const backend =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  (process.env.NODE_ENV === 'production'
-    ? 'https://testpilot-64v5.onrender.com'
-    : 'http://localhost:8001');
+  // Canonical gateway endpoint for this codebase state.
+  // Do not fallback to localhost gateway here.
+  'https://testpilot-64v5.onrender.com';
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);

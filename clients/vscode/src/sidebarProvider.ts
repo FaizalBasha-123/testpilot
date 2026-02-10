@@ -3,11 +3,30 @@ import { CommitTracker, TrackedCommit } from './commitTracker';
 import { SecurityAnalyzer, AnalysisResult, FixProposal } from './securityAnalyzer';
 import { StagingManager } from '../../../adapters/vscode/stagingManager';
 import { gitHelper } from '../../../adapters/vscode/gitHelper';
+import * as path from 'path';
 
 const fetch: any = require('node-fetch');
 
 type ViewState = 'commitList' | 'commitDetail' | 'securityWelcome' | 'securityRunning' | 'securityResults';
 type ToggleState = 'commits' | 'security';
+
+interface CommitReviewIssue {
+    severity: string;
+    description: string;
+}
+
+interface CommitReviewFix {
+    filename: string;
+    new_content?: string;
+    newContent?: string;
+}
+
+interface CommitReviewData {
+    summary?: string;
+    score?: number;
+    issues?: CommitReviewIssue[];
+    fixes?: CommitReviewFix[];
+}
 
 // SVG Icons (inline, enterprise-grade)
 const SVG = {
@@ -41,9 +60,16 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
     private _selectedCommit?: TrackedCommit;
     private _commitTracker: CommitTracker;
     private _securityAnalyzer: SecurityAnalyzer;
+    private _stagingManager: StagingManager;
     private _extensionUri: vscode.Uri;
     private _analysisResult?: AnalysisResult;
     private _collapsedSections: Set<string> = new Set();
+    private _contextStatus: { state: 'idle' | 'running' | 'completed' | 'failed'; percentage: number; detail: string } = {
+        state: 'idle',
+        percentage: 0,
+        detail: 'Waiting for workspace context sync'
+    };
+    private _commitFixStates: Map<string, 'pending' | 'accepted' | 'rejected'> = new Map();
 
     constructor(
         extensionUri: vscode.Uri,
@@ -52,6 +78,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
     ) {
         this._extensionUri = extensionUri;
         this._commitTracker = commitTracker;
+        this._stagingManager = stagingManager;
         this._securityAnalyzer = new SecurityAnalyzer(stagingManager);
 
         this._commitTracker.onCommitsChanged(() => {
@@ -127,7 +154,12 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                     const fixToAccept = this._analysisResult?.fixes.find(f => f.filename === message.filename);
                     if (fixToAccept) {
                         await this._securityAnalyzer.acceptFix(fixToAccept);
+                        this._analysisResult = {
+                            ...this._analysisResult!,
+                            fixes: this._analysisResult!.fixes.filter(f => f.filename !== message.filename)
+                        };
                         vscode.window.showInformationMessage(`Applied fix to ${message.filename}`);
+                        this._updateView();
                     }
                     break;
 
@@ -135,8 +167,21 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                     const fixToReject = this._analysisResult?.fixes.find(f => f.filename === message.filename);
                     if (fixToReject) {
                         await this._securityAnalyzer.rejectFix(fixToReject);
+                        this._analysisResult = {
+                            ...this._analysisResult!,
+                            fixes: this._analysisResult!.fixes.filter(f => f.filename !== message.filename)
+                        };
                         vscode.window.showInformationMessage(`Rejected fix for ${message.filename}`);
+                        this._updateView();
                     }
+                    break;
+
+                case 'acceptCommitFix':
+                    await this._acceptCommitFix(message.filename);
+                    break;
+
+                case 'rejectCommitFix':
+                    await this._rejectCommitFix(message.filename);
                     break;
 
                 case 'openFile':
@@ -146,6 +191,31 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         });
 
         this._updateView();
+    }
+
+    public startBackgroundContextBuild(): void {
+        this._contextStatus = {
+            state: 'running',
+            percentage: 0,
+            detail: 'Scheduling context preparation job'
+        };
+        this._updateView();
+
+        this._securityAnalyzer.startContextBuild((progress) => {
+            const nextState =
+                progress.state === 'completed'
+                    ? 'completed'
+                    : progress.state === 'failed'
+                        ? 'failed'
+                        : 'running';
+
+            this._contextStatus = {
+                state: nextState,
+                percentage: Math.min(100, Math.max(0, progress.percentage)),
+                detail: progress.detail
+            };
+            this._updateView();
+        });
     }
 
     private _updateView() {
@@ -184,47 +254,82 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
             if (!workspacePath) return;
 
             const diff = await gitHelper.getCommitDiff(workspacePath, commit.sha);
-            const repo = await gitHelper.getRemoteOrigin(workspacePath) || 'local/repo';
+            const gitLog = await gitHelper.getLog(workspacePath, 50);
 
             const config = vscode.workspace.getConfiguration('testpilot');
-            const backendUrl = config.get('backendUrl', 'http://localhost:8001');
+            const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
 
-            const response = await fetch(`${backendUrl}/api/review-commit`, {
+            // Commit review uses the same real backend pipeline as security analysis.
+            // This intentionally avoids local mock heuristics and always requests AI-core analysis.
+            const zip = require('jszip');
+            const archive = new zip();
+            await this._addFolderToZip(archive, workspacePath, workspacePath);
+            const content = await archive.generateAsync({ type: 'nodebuffer' });
+
+            const form = new (require('form-data'))();
+            form.append('file', content, 'repo.zip');
+            form.append('git_log', gitLog || '');
+            form.append('git_diff', diff || '');
+
+            const response = await fetch(`${backendUrl}/api/v1/ide/review_repo_async`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    repo: repo,
-                    commit_sha: commit.sha,
-                    diff: diff,
-                    files: commit.files
-                })
+                body: form,
+                headers: form.getHeaders()
             });
 
-            if (response.ok) {
-                const reviewData = await response.json();
-                await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', reviewData);
-            } else {
-                await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', this._getMockReviewData());
+            if (!response.ok) {
+                throw new Error(`Review submit failed: ${response.status} ${response.statusText}`);
             }
+
+            const submitted = await response.json();
+            const jobId = submitted.job_id as string | undefined;
+            if (!jobId) {
+                throw new Error('Commit review response missing job_id');
+            }
+
+            let reviewData: CommitReviewData | undefined;
+            while (!reviewData) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                const statusResponse = await fetch(`${backendUrl}/api/v1/ide/job_status/${jobId}`);
+                if (!statusResponse.ok) {
+                    throw new Error(`Review status failed: ${statusResponse.status} ${statusResponse.statusText}`);
+                }
+
+                const statusData = await statusResponse.json();
+                if (statusData.status === 'completed') {
+                    const result = statusData.result || {};
+                    const fixes = Array.isArray(result.fixes) ? result.fixes : [];
+                    const issues = Array.isArray(result.sonar_data)
+                        ? result.sonar_data.map((item: any) => ({
+                            severity: (item.severity || 'info').toString().toLowerCase(),
+                            description: item.message || ''
+                        }))
+                        : [];
+
+                    reviewData = {
+                        summary: result.review || 'Review completed',
+                        score: issues.length === 0 ? 100 : Math.max(30, 100 - (issues.length * 10)),
+                        issues,
+                        fixes
+                    };
+                } else if (statusData.status === 'failed') {
+                    throw new Error(statusData.error || statusData.result?.error || 'Commit review failed');
+                }
+            }
+
+            await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', reviewData);
         } catch (e) {
-            await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', this._getMockReviewData());
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', {
+                summary: `Review failed: ${errorMessage}`,
+                score: 0,
+                issues: [{ severity: 'critical', description: errorMessage }],
+                fixes: []
+            });
         }
 
         this._selectedCommit = this._commitTracker.getCommit(commit.sha);
         this._updateView();
-    }
-
-    private _getMockReviewData() {
-        return {
-            summary: "Code changes look good with minor suggestions.",
-            score: 85,
-            issues: [
-                { severity: 'info', description: 'Consider adding descriptive variable names', file: 'page.tsx', line: 15 }
-            ],
-            suggestions: [
-                { description: 'Add error handling for edge cases' }
-            ]
-        };
     }
 
     private async _openFile(filename: string) {
@@ -237,6 +342,73 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
             await vscode.window.showTextDocument(doc);
         } catch (e) {
             vscode.window.showErrorMessage(`Could not open: ${filename}`);
+        }
+    }
+
+    private _getCommitReviewData(commit: TrackedCommit): CommitReviewData {
+        return (commit.reviewData || {}) as CommitReviewData;
+    }
+
+    private async _acceptCommitFix(filename: string): Promise<void> {
+        if (!this._selectedCommit) return;
+
+        const data = this._getCommitReviewData(this._selectedCommit);
+        const fix = (data.fixes || []).find(f => f.filename === filename);
+        if (!fix) return;
+
+        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspacePath) return;
+
+        const newContent = fix.new_content || fix.newContent;
+        if (!newContent) {
+            vscode.window.showWarningMessage(`No generated code found for ${filename}`);
+            return;
+        }
+
+        const filePath = path.join(workspacePath, filename);
+        await this._stagingManager.stageFile(filePath, newContent, true);
+        await this._stagingManager.acceptChange(filePath);
+        this._commitFixStates.set(filename, 'accepted');
+        this._updateView();
+    }
+
+    private async _rejectCommitFix(filename: string): Promise<void> {
+        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (workspacePath) {
+            const filePath = path.join(workspacePath, filename);
+            if (this._stagingManager.isStaged(filePath)) {
+                await this._stagingManager.rejectChange(filePath);
+            }
+        }
+        this._commitFixStates.set(filename, 'rejected');
+        this._updateView();
+    }
+
+    private async _addFolderToZip(zip: any, folderPath: string, rootPath: string): Promise<void> {
+        const fs = require('fs');
+        const excludeDirs = ['.git', 'node_modules', 'dist', 'out', '__pycache__', '.vscode', '.next', 'build', 'coverage', '.checkpoints', 'target'];
+        const excludeExtensions = ['.exe', '.dll', '.so', '.dylib', '.zip', '.tar', '.gz'];
+
+        const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(folderPath, entry.name);
+            const relPath = path.relative(rootPath, fullPath);
+
+            if (entry.isDirectory()) {
+                if (excludeDirs.includes(entry.name)) continue;
+                await this._addFolderToZip(zip, fullPath, rootPath);
+                continue;
+            }
+
+            const ext = path.extname(entry.name).toLowerCase();
+            if (excludeExtensions.includes(ext)) continue;
+
+            try {
+                const content = await fs.promises.readFile(fullPath);
+                zip.file(relPath, content);
+            } catch {
+                // Skip unreadable files.
+            }
         }
     }
 
@@ -315,11 +487,12 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
 
         let reviewsHtml = '';
         if (isReviewed && commit.reviewData) {
-            const data = commit.reviewData;
-            const scoreIcon = data.score >= 80 ? SVG.check : data.score >= 60 ? SVG.medium : SVG.critical;
+            const data = this._getCommitReviewData(commit);
+            const score = data.score ?? 0;
+            const scoreIcon = score >= 80 ? SVG.check : score >= 60 ? SVG.medium : SVG.critical;
             reviewsHtml = `
                 <div class="review-summary">
-                    <div class="score">${scoreIcon} Score: ${data.score}/100</div>
+                    <div class="score">${scoreIcon} Score: ${score}/100</div>
                     <div class="summary-text">${data.summary || ''}</div>
                 </div>
             `;
@@ -330,6 +503,27 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                     reviewsHtml += `<div class="issue-row">${badge} ${issue.description}</div>`;
                 }
                 reviewsHtml += '</div>';
+            }
+
+            const pendingFixes = (data.fixes || []).filter(f => this._commitFixStates.get(f.filename) !== 'accepted' && this._commitFixStates.get(f.filename) !== 'rejected');
+            if (pendingFixes.length > 0) {
+                reviewsHtml += `
+                    <div class="section-header" style="padding-left:0;padding-right:0;border:none;">
+                        <span>PROPOSED FIXES</span>
+                        <span class="badge">${pendingFixes.length}</span>
+                    </div>
+                `;
+                for (const fix of pendingFixes) {
+                    reviewsHtml += `
+                        <div class="fix-row">
+                            <div class="fix-file">${SVG.file} ${fix.filename}</div>
+                            <div class="fix-actions">
+                                <button class="action-btn accept" onclick="acceptCommitFix('${fix.filename}')">${SVG.accept} Accept</button>
+                                <button class="action-btn reject" onclick="rejectCommitFix('${fix.filename}')">${SVG.reject} Reject</button>
+                            </div>
+                        </div>
+                    `;
+                }
             }
         }
 
@@ -468,6 +662,19 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         });
     }
 
+    private _getContextStatusText(): string {
+        if (this._contextStatus.state === 'running') {
+            return `Context sync ${this._contextStatus.percentage}%: ${this._contextStatus.detail}`;
+        }
+        if (this._contextStatus.state === 'completed') {
+            return 'Context sync 100%: ready';
+        }
+        if (this._contextStatus.state === 'failed') {
+            return `Context sync failed: ${this._contextStatus.detail}`;
+        }
+        return this._contextStatus.detail;
+    }
+
     private _wrapHtml(content: string): string {
         return `<!DOCTYPE html>
 <html lang="en">
@@ -484,6 +691,26 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
             height: 100vh;
             display: flex;
             flex-direction: column;
+        }
+        .brand-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 14px 12px 6px;
+        }
+        .brand-title {
+            font-size: 28px;
+            line-height: 1.1;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+        }
+        .brand-status {
+            width: 100%;
+            text-align: right;
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground, #888);
+            min-height: 14px;
         }
 
         /* Spinner animation */
@@ -737,6 +964,10 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
     </style>
 </head>
 <body>
+    <div class="brand-header">
+        <div class="brand-title">TestPilot</div>
+        <div class="brand-status">${this._escapeHtml(this._getContextStatusText())}</div>
+    </div>
     <div class="toggle-container">
         <button class="toggle-btn ${this._selectedToggle === 'commits' ? 'active' : ''}" onclick="setToggle('commits')">Commit Reviews</button>
         <button class="toggle-btn ${this._selectedToggle === 'security' ? 'active' : ''}" onclick="setToggle('security')">Security Analysis</button>
@@ -754,6 +985,8 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         function startSecurityAnalysis() { vscode.postMessage({ type: 'startSecurityAnalysis' }); }
         function acceptFix(filename) { vscode.postMessage({ type: 'acceptFix', filename }); }
         function rejectFix(filename) { vscode.postMessage({ type: 'rejectFix', filename }); }
+        function acceptCommitFix(filename) { vscode.postMessage({ type: 'acceptCommitFix', filename }); }
+        function rejectCommitFix(filename) { vscode.postMessage({ type: 'rejectCommitFix', filename }); }
     </script>
 </body>
 </html>`;
