@@ -1,54 +1,65 @@
-aiohttp==3.12.15
-anthropic>=0.69.0
-#anthropic[vertex]==0.47.1
-atlassian-python-api==3.41.4
-azure-devops==7.1.0b3
-azure-identity==1.25.0
-boto3==1.40.45
-certifi==2024.8.30
-dynaconf==3.2.4
+# ===================================================================
+# AI Core Dependencies - API-Only (No PyTorch/Local ML Models)
+# ===================================================================
+
+# Web Framework
 fastapi==0.118.0
-GitPython==3.1.41
-google-cloud-aiplatform==1.38.0
-google-generativeai==0.8.3
-google-cloud-storage==2.10.0
-Jinja2==3.1.6
-litellm==1.77.7
-loguru==0.7.2
-msrest==0.7.1
-openai>=1.55.3
-pytest==7.4.0
-PyGithub==1.59.*
-PyYAML==6.0.1
-python-gitlab==3.15.0
-retry==0.9.2
-starlette-context==0.3.6
-tiktoken==0.8.0
-ujson==5.8.0
 uvicorn==0.22.0
-tenacity==8.2.3
 gunicorn==23.0.0
-pytest-cov==5.0.0
-pydantic==2.8.2
-html2text==2024.2.26
-giteapy==1.0.8
-# Uncomment the following lines to enable the 'similar issue' tool
-# pinecone-client
-# pinecone-datasets @ git+https://github.com/mrT23/pinecone-datasets.git@main
-lancedb==0.5.1
-sentence-transformers==2.2.2
-# qdrant-client==1.15.1
-# uncomment this to support language LangChainOpenAIHandler
-# langchain==0.2.0
-# langchain-core==0.2.28
-# langchain-openai==0.1.20
+starlette-context==0.3.6
 python-multipart
 
-# Tree-sitter for Code Graph v2 (multi-language AST parsing)
+# LLM API Clients (No local models!)
+litellm==1.77.7              # Legacy embeddings helpers; LLM requests use Groq directly
+openai>=1.55.3               # OpenAI API
+anthropic>=0.69.0            # Claude API
+
+# Additional API Providers (Optional)
+google-generativeai==0.8.3   # Gemini API
+google-cloud-aiplatform==1.38.0
+google-cloud-storage==2.10.0
+boto3==1.40.45               # AWS Bedrock
+azure-identity==1.25.0       # Azure OpenAI
+
+# Git Integrations
+GitPython==3.1.41
+PyGithub==1.59.*
+python-gitlab==3.15.0
+atlassian-python-api==3.41.4
+azure-devops==7.1.0b3
+giteapy==1.0.8
+
+# Utilities
+aiohttp==3.12.15
+certifi==2024.8.30
+dynaconf==3.2.4
+Jinja2==3.1.6
+loguru==0.7.2
+msrest==0.7.1
+PyYAML==6.0.1
+retry==0.9.2
+tiktoken==0.8.0              # Token counting only (no models)
+ujson==5.8.0
+tenacity==8.2.3
+pydantic==2.8.2
+html2text==2024.2.26
+
+# Testing
+pytest==7.4.0
+pytest-cov==5.0.0
+
+# Tree-sitter for Code Graph (Pure parser - No ML)
 tree-sitter>=0.23.0
 tree-sitter-python>=0.23.0
 tree-sitter-javascript>=0.23.0
-# Optional: Add more languages as needed
-# tree-sitter-typescript>=0.23.0
-# tree-sitter-go>=0.23.0
-# tree-sitter-rust>=0.23.0
+
+# ===================================================================
+# REMOVED: Heavy ML Dependencies
+# ===================================================================
+# sentence-transformers  - REMOVED (PyTorch + 2GB+ of models)
+# lancedb               - REMOVED (vector DB with embeddings)
+# torch                 - REMOVED (not needed for API-only)
+# transformers          - REMOVED (not needed for API-only)
+# qdrant-client         - Use external Qdrant if needed
+# pinecone-client       - Use external Pinecone if needed
+# langchain             - REMOVED (heavy dependency chain)

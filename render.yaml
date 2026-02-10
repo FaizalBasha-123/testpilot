@@ -69,7 +69,7 @@ services:
       - key: EMBEDDING_API_BASE
         sync: false
       - key: EMBEDDING_MODEL
-        value: text-embedding-3-small
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: CONFIG__MODEL

@@ -229,15 +229,16 @@ class AnalysisOrchestrator:
             prompt = self._create_review_prompt(diff_content, context)
             
             # Call LLM
-            response = await self.ai_handler.chat_completion(
+            response, _ = await self.ai_handler.chat_completion(
                 model=get_settings().config.model,
-                messages=[{"role": "user", "content": prompt}],
+                system="",
+                user=prompt,
                 temperature=0.2
             )
             
             # Parse response
             import json
-            response_text = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            response_text = response
             
             # Try to extract JSON from response
             ai_result = self._parse_ai_response(response_text)
@@ -475,14 +476,15 @@ Respond with a JSON object containing:
 Respond with ONLY valid JSON."""
 
             # Call LLM
-            response = await self.ai_handler.chat_completion(
+            response, _ = await self.ai_handler.chat_completion(
                 model=get_settings().config.model_weak or get_settings().config.model,
-                messages=[{"role": "user", "content": prompt}],
+                system="",
+                user=prompt,
                 temperature=0.1
             )
             
             # Parse response
-            response_text = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            response_text = response
             fix_data = self._parse_ai_response(response_text)
             
             if fix_data and fix_data.get('fixed_code'):

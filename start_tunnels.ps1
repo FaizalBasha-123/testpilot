@@ -1,5 +1,5 @@
 # start_tunnels.ps1
-# Starts Cloudflare tunnels for local services and writes tunnel.md with env vars.
+# Starts Cloudflare quick tunnels for local services and writes tunnel.md with env vars.
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -27,7 +27,32 @@ function Resolve-CloudflaredPath {
     throw "cloudflared executable not found. Install cloudflared or add it to PATH."
 }
 
-function Start-TunnelJob {
+function Stop-OldTunnelProcesses {
+    param(
+        [Parameter(Mandatory = $true)][string]$PidFile
+    )
+
+    if (Test-Path $PidFile) {
+        try {
+            $oldPids = Get-Content -Path $PidFile | Where-Object { $_ -match '^\d+$' }
+            foreach ($pidText in $oldPids) {
+                $pid = [int]$pidText
+                $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                if ($proc -and $proc.ProcessName -like "cloudflared*") {
+                    Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+                }
+            }
+        } catch {
+            # ignore stale pid file errors
+        }
+        Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
+    }
+
+    # Hard cleanup for orphaned quick tunnels started earlier in this workspace.
+    Get-Process -Name cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
+function Start-TunnelProcess {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$LocalUrl,
@@ -35,28 +60,45 @@ function Start-TunnelJob {
     )
 
     $logFile = Join-Path (Get-Location) ("tunnel_{0}.log" -f $Name)
+    $errFile = Join-Path (Get-Location) ("tunnel_{0}.err.log" -f $Name)
     if (Test-Path $logFile) {
         Remove-Item $logFile -Force
     }
+    if (Test-Path $errFile) {
+        Remove-Item $errFile -Force
+    }
 
-    Start-Job -Name ("tunnel_{0}" -f $Name) -ScriptBlock {
-        param($ExePath, $TargetUrl, $OutFile)
-        & $ExePath tunnel --url $TargetUrl *> $OutFile
-    } -ArgumentList $CloudflaredPath, $LocalUrl, $logFile | Out-Null
+    New-Item -Path $logFile -ItemType File -Force | Out-Null
+    New-Item -Path $errFile -ItemType File -Force | Out-Null
 
-    return $logFile
+    $proc = Start-Process -FilePath $CloudflaredPath `
+        -ArgumentList @("tunnel", "--url", $LocalUrl, "--no-autoupdate") `
+        -RedirectStandardOutput $logFile `
+        -RedirectStandardError $errFile `
+        -WindowStyle Hidden `
+        -PassThru
+
+    return @{
+        LogPath = $logFile
+        ErrPath = $errFile
+        Process = $proc
+    }
 }
 
 function Get-TunnelUrlFromLog {
     param(
-        [Parameter(Mandatory = $true)][string]$LogPath
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$ErrPath
     )
 
-    if (-not (Test-Path $LogPath)) {
+    if ((-not (Test-Path $LogPath)) -and (-not (Test-Path $ErrPath))) {
         return $null
     }
 
-    $content = Get-Content -Path $LogPath -Raw -ErrorAction SilentlyContinue
+    $content = @(
+        (Get-Content -Path $LogPath -Raw -ErrorAction SilentlyContinue),
+        (Get-Content -Path $ErrPath -Raw -ErrorAction SilentlyContinue)
+    ) -join "`n"
     if (-not $content) {
         return $null
     }
@@ -68,34 +110,53 @@ function Get-TunnelUrlFromLog {
     return $null
 }
 
+function Wait-ForRemoteEndpoint {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [int]$TimeoutSeconds = 45
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 10
+            if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) {
+                return $true
+            }
+        } catch {
+            # retry
+        }
+        Start-Sleep -Seconds 2
+    }
+    return $false
+}
+
 # Service-to-local-port mapping.
 $serviceMap = @(
-    @{ Name = "ai_core";       LocalUrl = "http://localhost:3000" },
-    @{ Name = "sonar_scanner"; LocalUrl = "http://localhost:8001" },
-    @{ Name = "sonarqube";     LocalUrl = "http://localhost:9000" }
+    @{ Name = "ai_core";       LocalUrl = "http://localhost:3000"; HealthPath = "/health" },
+    @{ Name = "sonar_scanner"; LocalUrl = "http://localhost:8001"; HealthPath = "/health" },
+    @{ Name = "sonarqube";     LocalUrl = "http://localhost:9000"; HealthPath = "/api/system/status" }
 )
 
 $cloudflared = Resolve-CloudflaredPath
 Write-Host ("Using cloudflared: {0}" -f $cloudflared)
 
-# Stop previous cloudflared and tunnel jobs to avoid stale URLs.
-Get-Job -Name "tunnel_*" -ErrorAction SilentlyContinue | Stop-Job -ErrorAction SilentlyContinue
-Get-Job -Name "tunnel_*" -ErrorAction SilentlyContinue | Remove-Job -Force -ErrorAction SilentlyContinue
-Stop-Process -Name cloudflared -ErrorAction SilentlyContinue
+$pidFile = Join-Path (Get-Location) "tunnel_pids.txt"
+Stop-OldTunnelProcesses -PidFile $pidFile
 
-$logs = @{}
+$procInfo = @{}
 foreach ($svc in $serviceMap) {
     Write-Host ("Starting tunnel {0} -> {1}" -f $svc.Name, $svc.LocalUrl)
-    $logs[$svc.Name] = Start-TunnelJob -Name $svc.Name -LocalUrl $svc.LocalUrl -CloudflaredPath $cloudflared
+    $procInfo[$svc.Name] = Start-TunnelProcess -Name $svc.Name -LocalUrl $svc.LocalUrl -CloudflaredPath $cloudflared
 }
 
 # Wait for URLs to appear in logs.
-$deadline = (Get-Date).AddSeconds(45)
+$deadline = (Get-Date).AddSeconds(60)
 $urls = @{}
 while ((Get-Date) -lt $deadline) {
     foreach ($svc in $serviceMap) {
         if (-not $urls.ContainsKey($svc.Name)) {
-            $url = Get-TunnelUrlFromLog -LogPath $logs[$svc.Name]
+            $url = Get-TunnelUrlFromLog -LogPath $procInfo[$svc.Name].LogPath -ErrPath $procInfo[$svc.Name].ErrPath
             if ($url) {
                 $urls[$svc.Name] = $url
             }
@@ -106,16 +167,35 @@ while ((Get-Date) -lt $deadline) {
         break
     }
 
-    Start-Sleep -Milliseconds 800
+    Start-Sleep -Milliseconds 700
 }
 
 if ($urls.Count -ne $serviceMap.Count) {
     Write-Host "Failed to fetch all tunnel URLs. Check log files:" -ForegroundColor Red
     foreach ($svc in $serviceMap) {
-        Write-Host ("  {0}: {1}" -f $svc.Name, $logs[$svc.Name])
+        Write-Host ("  {0}: {1}" -f $svc.Name, $procInfo[$svc.Name].LogPath)
     }
     exit 1
 }
+
+# Verify tunnel reachability and keep running even if one lags.
+foreach ($svc in $serviceMap) {
+    $probeUrl = $urls[$svc.Name] + $svc.HealthPath
+    $ok = Wait-ForRemoteEndpoint -Url $probeUrl -TimeoutSeconds 30
+    if (-not $ok) {
+        Write-Host ("Warning: tunnel endpoint not yet reachable: {0}" -f $probeUrl) -ForegroundColor Yellow
+    }
+}
+
+# Persist process ids for next cleanup.
+$pids = @()
+foreach ($svc in $serviceMap) {
+    $p = $procInfo[$svc.Name].Process
+    if ($p -and -not $p.HasExited) {
+        $pids += [string]$p.Id
+    }
+}
+Set-Content -Path $pidFile -Value ($pids -join "`r`n")
 
 $aiCoreUrl = $urls["ai_core"]
 $sonarScannerUrl = $urls["sonar_scanner"]
@@ -135,9 +215,9 @@ $doc = @()
 $doc += "# Tunnel Environment Variables"
 $doc += "# Generated by start_tunnels.ps1 at $(Get-Date -Format s)"
 $doc += ""
-$doc += "```env"
+$doc += '```env'
 $doc += $envLines
-$doc += "```"
+$doc += '```'
 $doc += ""
 $doc += "# Raw key=value"
 $doc += $envLines
@@ -154,5 +234,5 @@ foreach ($line in $envLines) {
 Write-Host ""
 Write-Host "Log files:"
 foreach ($svc in $serviceMap) {
-    Write-Host ("  {0}: {1}" -f $svc.Name, $logs[$svc.Name])
+    Write-Host ("  {0}: {1}" -f $svc.Name, $procInfo[$svc.Name].LogPath)
 }

@@ -52,7 +52,7 @@ class EmbeddingsService:
     def __init__(
         self,
         collection_name: str = "code_chunks",
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str = "",
         qdrant_url: Optional[str] = None,
         qdrant_api_key: Optional[str] = None,
         use_memory: bool = True
@@ -68,7 +68,7 @@ class EmbeddingsService:
             use_memory: Use in-memory Qdrant (faster for dev)
         """
         self.collection_name = collection_name
-        self.embedding_model = os.environ.get("EMBEDDING_MODEL", embedding_model)
+        self.embedding_model = os.environ.get("EMBEDDING_MODEL", embedding_model).strip()
         self.qdrant_url = qdrant_url or os.environ.get("QDRANT_URL")
         self.qdrant_api_key = qdrant_api_key or os.environ.get("QDRANT_API_KEY")
         self.embedding_api_key = os.environ.get("GROQ_EMBEDDING_API_KEY")
@@ -143,6 +143,9 @@ class EmbeddingsService:
     
     def _embed(self, text: str) -> List[float]:
         """Get embedding for text."""
+        if not self.embedding_model:
+            raise ValueError("EMBEDDING_MODEL is required")
+
         # Groq-hosted embeddings via OpenAI-compatible API.
         self._init_embedding_client()
         response = self._embedding_client.embeddings.create(

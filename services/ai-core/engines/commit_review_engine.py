@@ -107,7 +107,7 @@ class CommitReviewEngine:
         
         # Call AI
         system_prompt = self._get_system_prompt(request.review_type)
-        response = await self.ai_handler.chat_completion(
+        response, _ = await self.ai_handler.chat_completion(
             model=self._model,
             system=system_prompt,
             user=prompt,

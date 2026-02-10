@@ -6,6 +6,15 @@ WORKDIR /app
 ADD pyproject.toml .
 ADD requirements.txt .
 ADD docs docs
+
+# ===================================================================
+# API-ONLY BUILD - NO PyTorch/TensorFlow/Local ML Models
+# ===================================================================
+# REMOVED: torch torchvision torchaudio installation
+# All LLM inference happens via cloud APIs (Groq, OpenAI, Anthropic)
+# using direct API clients - NO local models needed
+# ===================================================================
+
 RUN pip install --no-cache-dir . && rm pyproject.toml requirements.txt
 ENV PYTHONPATH=/app
 

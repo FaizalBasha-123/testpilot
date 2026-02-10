@@ -1,3 +1,4 @@
+import os
 import time
 from enum import Enum
 from typing import List
@@ -280,8 +281,24 @@ class PRSimilarIssue:
         get_logger().info('Done')
 
         get_logger().info('Querying...')
-        res = openai.Embedding.create(input=[issue_str], engine=MODEL)
-        embeds = [record['embedding'] for record in res['data']]
+        embedding_model = get_settings().pr_similar_issue.get("embedding_model", MODEL)
+        embedding_api_base = os.environ.get("EMBEDDING_API_BASE", "https://api.groq.com/openai/v1")
+        embedding_api_key = (
+            os.environ.get("GROQ_EMBEDDING_API_KEY")
+            or os.environ.get("OPENAI_API_KEY")
+            or get_settings().get("OPENAI.KEY")
+        )
+        if not embedding_api_key:
+            raise ValueError("Missing embedding API key (GROQ_EMBEDDING_API_KEY or OPENAI_API_KEY)")
+
+        try:
+            client = openai.OpenAI(api_key=embedding_api_key, base_url=embedding_api_base)
+            res = client.embeddings.create(model=embedding_model, input=[issue_str])
+            embeds = [record.embedding for record in res.data]
+        except Exception as e:
+            get_logger().error(f"Failed to generate embedding with {embedding_model}: {e}")
+            raise
+
 
         relevant_issues_number_list = []
         relevant_comment_number_list = []
@@ -457,17 +474,18 @@ class PRSimilarIssue:
         get_logger().info('Done')
 
         get_logger().info('Embedding...')
-        openai.api_key = get_settings().openai.key
+        # Use LiteLLM
+        embedding_model = get_settings().pr_similar_issue.get("embedding_model", "text-embedding-ada-002")
         list_to_encode = list(df["text"].values)
         try:
-            res = openai.Embedding.create(input=list_to_encode, engine=MODEL)
+            res = litellm.embedding(model=embedding_model, input=list_to_encode)
             embeds = [record['embedding'] for record in res['data']]
         except:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
             for i, text in enumerate(list_to_encode):
                 try:
-                    res = openai.Embedding.create(input=[text], engine=MODEL)
+                    res = litellm.embedding(model=embedding_model, input=[text])
                     embeds.append(res['data'][0]['embedding'])
                 except:
                     embeds.append([0] * 1536)
@@ -553,17 +571,18 @@ class PRSimilarIssue:
         get_logger().info('Done')
 
         get_logger().info('Embedding...')
-        openai.api_key = get_settings().openai.key
+        # Use LiteLLM
+        embedding_model = get_settings().pr_similar_issue.get("embedding_model", "text-embedding-ada-002")
         list_to_encode = list(df["text"].values)
         try:
-            res = openai.Embedding.create(input=list_to_encode, engine=MODEL)
+            res = litellm.embedding(model=embedding_model, input=list_to_encode)
             embeds = [record['embedding'] for record in res['data']]
         except:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
             for i, text in enumerate(list_to_encode):
                 try:
-                    res = openai.Embedding.create(input=[text], engine=MODEL)
+                    res = litellm.embedding(model=embedding_model, input=[text])
                     embeds.append(res['data'][0]['embedding'])
                 except:
                     embeds.append([0] * 1536)
@@ -652,17 +671,18 @@ class PRSimilarIssue:
         get_logger().info('Done')
 
         get_logger().info('Embedding...')
-        openai.api_key = get_settings().openai.key
+        # Use LiteLLM
+        embedding_model = get_settings().pr_similar_issue.get("embedding_model", "text-embedding-ada-002")
         list_to_encode = list(df["text"].values)
         try:
-            res = openai.Embedding.create(input=list_to_encode, engine=MODEL)
+            res = litellm.embedding(model=embedding_model, input=list_to_encode)
             embeds = [record['embedding'] for record in res['data']]
         except Exception:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
             for i, text in enumerate(list_to_encode):
                 try:
-                    res = openai.Embedding.create(input=[text], engine=MODEL)
+                    res = litellm.embedding(model=embedding_model, input=[text])
                     embeds.append(res['data'][0]['embedding'])
                 except Exception:
                     embeds.append([0] * 1536)

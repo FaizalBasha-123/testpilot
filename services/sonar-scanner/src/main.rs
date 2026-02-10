@@ -126,11 +126,13 @@ async fn main() {
         );
 
     // Run the server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .expect("Failed to bind to port 8000");
+        .expect(&format!("Failed to bind to {}", addr));
 
-    info!("Server listening on 0.0.0.0:8000");
+    info!("Server listening on {}", addr);
 
     axum::serve(listener, app)
         .await

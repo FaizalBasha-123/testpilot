@@ -444,6 +444,11 @@ async def root():
     return {"status": "ok"}
 
 
+@router.get("/health")
+async def health():
+    return {"status": "ok", "build": build_number}
+
+
 if get_settings().github_app.override_deployment_type:
     # Override the deployment type to app
     get_settings().set("GITHUB.DEPLOYMENT_TYPE", "app")

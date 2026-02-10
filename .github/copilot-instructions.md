@@ -92,6 +92,6 @@ The "Face".
 ---
 
 ## 5. Common Commands
-- **Start Stack:** `docker-compose up --build -d`
+- **Start Stack:** `docker-compose up --build -d ai-core sonar-scanner sonarqube redis postgres qdrant`
 - **Setup Tunnels:** `./setup-tunnels.sh`
 - **Rebuild AI Core:** `docker-compose build ai-core && docker-compose up -d ai-core`

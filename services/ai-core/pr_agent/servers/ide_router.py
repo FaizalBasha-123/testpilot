@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, Request
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, Request, HTTPException
 from pydantic import BaseModel
 import tempfile
 import os
@@ -1102,13 +1102,17 @@ async def analyze_unified(
     Returns:
         job_id: Use to poll /job_status/{job_id}
     """
-    job_id = str(uuid.uuid4())
-    temp_dir = os.path.join("/tmp", f"blackbox_unified_{os.urandom(4).hex()}")
-    os.makedirs(temp_dir, exist_ok=True)
-    
-    zip_path = os.path.join(temp_dir, "repo.zip")
-    with open(zip_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        job_id = str(uuid.uuid4())
+        temp_dir = os.path.join("/tmp", f"blackbox_unified_{os.urandom(4).hex()}")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        zip_path = os.path.join(temp_dir, "repo.zip")
+        with open(zip_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as exc:
+        get_logger().error(f"[ide-analyze-unified] Failed to persist upload: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to persist uploaded archive")
     
     JOBS[job_id] = {
         "status": "pending",
@@ -1118,10 +1122,14 @@ async def analyze_unified(
         "analysis_type": "unified"
     }
     
-    background_tasks.add_task(
-        process_unified_analysis,
-        job_id, zip_path, temp_dir, git_diff
-    )
+    if background_tasks is None:
+        get_logger().warning("[ide-analyze-unified] background_tasks missing; using asyncio task")
+        asyncio.create_task(process_unified_analysis(job_id, zip_path, temp_dir, git_diff))
+    else:
+        background_tasks.add_task(
+            process_unified_analysis,
+            job_id, zip_path, temp_dir, git_diff
+        )
     
     return {"job_id": job_id, "status": "pending", "analysis_type": "unified"}
 

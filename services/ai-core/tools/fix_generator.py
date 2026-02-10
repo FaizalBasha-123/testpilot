@@ -158,7 +158,7 @@ class FixGenerator:
             )
             
             # Call LLM
-            response = await self.ai_handler.chat_completion(
+            response, _ = await self.ai_handler.chat_completion(
                 model=get_settings().config.model,
                 system="You are a security-focused code fixer. Generate precise, minimal fixes.",
                 user=prompt
