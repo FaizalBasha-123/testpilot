@@ -178,6 +178,12 @@ class SecurityAnalyzer {
                 while (!finished) {
                     yield new Promise(resolve => setTimeout(resolve, 2000));
                     const statusResponse = yield fetch(`${backendUrl}/api/v1/ide/job_status/${job_id}`);
+                    if (statusResponse.status === 404) {
+                        // Backward-compatibility: old gateway versions cannot poll analyze_unified jobs.
+                        onProgress({ state: 'running', percentage: 15, detail: 'Gateway status fallback: switching context sync mode' });
+                        yield this._startLegacyContextBuild(backendUrl, content, onProgress);
+                        return;
+                    }
                     if (!statusResponse.ok) {
                         throw new Error(`Context status failed: ${statusResponse.status} ${statusResponse.statusText}`);
                     }
@@ -204,6 +210,50 @@ class SecurityAnalyzer {
             catch (error) {
                 this._outputChannel.appendLine(`[SecurityAnalyzer] Context build error: ${error}`);
                 onProgress({ state: 'failed', percentage: 0, detail: (error === null || error === void 0 ? void 0 : error.message) || String(error) });
+            }
+        });
+    }
+    _startLegacyContextBuild(backendUrl, zipContent, onProgress) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const form = new FormData();
+            form.append('file', zipContent, 'repo.zip');
+            const submitResponse = yield fetch(`${backendUrl}/api/v1/ide/review_repo_async`, {
+                method: 'POST',
+                body: form,
+                headers: form.getHeaders()
+            });
+            if (!submitResponse.ok) {
+                throw new Error(`Legacy context build submit failed: ${submitResponse.status} ${submitResponse.statusText}`);
+            }
+            const submitted = yield submitResponse.json();
+            const jobId = submitted.job_id;
+            if (!jobId) {
+                throw new Error('Legacy context build response missing job_id');
+            }
+            onProgress({ state: 'running', percentage: 20, detail: `Legacy context sync started (${jobId})` });
+            let finished = false;
+            while (!finished) {
+                yield new Promise(resolve => setTimeout(resolve, 2000));
+                const statusResponse = yield fetch(`${backendUrl}/api/v1/ide/job_status/${jobId}`);
+                if (!statusResponse.ok) {
+                    throw new Error(`Legacy context status failed: ${statusResponse.status} ${statusResponse.statusText}`);
+                }
+                const statusData = yield statusResponse.json();
+                const status = statusData.status || 'pending';
+                const logs = Array.isArray(statusData.logs) ? statusData.logs : [];
+                const detail = logs.length > 0 ? String(logs[logs.length - 1]) : 'Preparing repository context';
+                if (status === 'completed') {
+                    onProgress({ state: 'completed', percentage: 100, detail: 'Context sync completed (legacy mode)' });
+                    finished = true;
+                }
+                else if (status === 'failed') {
+                    const err = statusData.error || 'Legacy context sync failed';
+                    onProgress({ state: 'failed', percentage: 0, detail: String(err) });
+                    finished = true;
+                }
+                else {
+                    onProgress({ state: 'running', percentage: 35, detail });
+                }
             }
         });
     }
