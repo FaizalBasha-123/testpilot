@@ -434,6 +434,144 @@ def _git_init_sync(temp_dir: str):
     # Git Init
     os.system(f"cd {temp_dir} && git init && git config user.email 'blackbox@localhost' && git config user.name 'Blackbox Tester' && git add . && git commit -m 'initial'")
 
+def _build_workspace_file_index(temp_dir: str):
+    """
+    Build a normalized index of extracted files so Sonar-reported paths can be
+    resolved even when the zip contains an extra root folder.
+    """
+    files_by_rel = {}
+    basenames = {}
+
+    for root, dirs, files in os.walk(temp_dir):
+        dirs[:] = [d for d in dirs if d not in [".git", "node_modules", "__pycache__", "venv", ".venv"]]
+        for name in files:
+            abs_path = os.path.join(root, name)
+            rel_path = os.path.relpath(abs_path, temp_dir).replace("\\", "/").lstrip("./")
+            files_by_rel[rel_path] = abs_path
+            basenames.setdefault(name, []).append(rel_path)
+
+    return {"files_by_rel": files_by_rel, "basenames": basenames}
+
+def _resolve_workspace_file(temp_dir: str, filename: str, file_index: dict):
+    """
+    Resolve a Sonar/AI-reported filename to an actual extracted file path.
+    Returns: (absolute_path_or_none, resolution_mode, debug_details)
+    """
+    files_by_rel = file_index.get("files_by_rel", {})
+    basenames = file_index.get("basenames", {})
+
+    raw = (filename or "").strip()
+    normalized = raw.replace("\\", "/").lstrip("./").lstrip("/")
+    candidates = []
+
+    if normalized:
+        candidates.append(normalized)
+        # If absolute path accidentally arrives, keep only workspace-relative suffix.
+        if "/tmp/" in normalized:
+            candidates.append(normalized.split("/tmp/", 1)[-1].lstrip("/"))
+
+    # 1) Exact normalized relative path
+    for candidate in candidates:
+        if candidate in files_by_rel:
+            return files_by_rel[candidate], "exact", {"candidate": candidate}
+
+    # 2) Suffix match (handles zip with extra top-level root directory)
+    for candidate in candidates:
+        suffix_hits = [rel for rel in files_by_rel.keys() if rel.endswith("/" + candidate) or rel == candidate]
+        if len(suffix_hits) == 1:
+            hit = suffix_hits[0]
+            return files_by_rel[hit], "suffix", {"candidate": candidate, "matched": hit}
+        if len(suffix_hits) > 1:
+            hit = sorted(suffix_hits, key=len)[0]
+            return files_by_rel[hit], "suffix_ambiguous_shortest", {"candidate": candidate, "matched": hit, "matches": len(suffix_hits)}
+
+    # 3) Basename unique match
+    base = os.path.basename(normalized)
+    if base and base in basenames:
+        hits = basenames[base]
+        if len(hits) == 1:
+            hit = hits[0]
+            return files_by_rel[hit], "basename", {"basename": base, "matched": hit}
+        if len(hits) > 1:
+            hit = sorted(hits, key=len)[0]
+            return files_by_rel[hit], "basename_ambiguous_shortest", {"basename": base, "matched": hit, "matches": len(hits)}
+
+    # 4) Last chance direct join (legacy behavior)
+    legacy = os.path.join(temp_dir, filename)
+    if os.path.exists(legacy):
+        return legacy, "legacy_direct", {"path": legacy}
+
+    legacy_backslash = os.path.join(temp_dir, filename.replace("/", "\\"))
+    if os.path.exists(legacy_backslash):
+        return legacy_backslash, "legacy_backslash", {"path": legacy_backslash}
+
+    return None, "not_found", {"filename": filename, "normalized": normalized}
+
+def _extract_issue_filename(issue: dict) -> str:
+    """
+    Normalize file path field from heterogeneous Sonar payload shapes.
+    Supports: component, file, filename, path
+    """
+    if not isinstance(issue, dict):
+        return ""
+
+    component = str(issue.get("component") or "").strip()
+    if component:
+        candidate = component.split(":")[-1].strip()
+        if candidate:
+            return candidate
+
+    for key in ("file", "filename", "path"):
+        val = str(issue.get(key) or "").strip()
+        if val:
+            return val
+
+    return ""
+
+def _apply_secret_fallback_fix(filename: str, content: str, issue: dict):
+    """
+    Deterministic fallback for secret exposure findings (e.g. Sonar secrets:S6334).
+    Returns a fixed file string when a safe automatic replacement is possible.
+    """
+    try:
+        rule = str(issue.get("rule") or "").lower()
+        message = str(issue.get("message") or "").lower()
+        is_secret_finding = ("s6334" in rule) or ("secret" in message) or ("api key" in message) or ("not disclosed" in message)
+        if not is_secret_finding:
+            return None
+
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in [".js", ".jsx", ".ts", ".tsx"]:
+            return None
+
+        patterns = [
+            # apiKey: "value" / api_key = "value"
+            (
+                re.compile(r'(?i)(\bapi[_-]?key\b\s*[:=]\s*)(["\'])([^"\']{8,})\2'),
+                r'\1process.env.FIREBASE_API_KEY'
+            ),
+            # token: "value" / secret: "value" / password: "value"
+            (
+                re.compile(r'(?i)(\b(token|secret|password)\b\s*[:=]\s*)(["\'])([^"\']{8,})\3'),
+                r'\1process.env.APP_SECRET'
+            ),
+        ]
+
+        fixed = content
+        changed = False
+        for pattern, replacement in patterns:
+            new_fixed = pattern.sub(replacement, fixed)
+            if new_fixed != fixed:
+                fixed = new_fixed
+                changed = True
+
+        if changed and fixed != content:
+            return fixed
+    except Exception:
+        return None
+
+    return None
+
 async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: str = None, git_diff: str = None):
     JOBS[job_id]["status"] = "processing"
     JOBS[job_id]["progress"] = {"current_file": "Initializing...", "processed": 0, "total": 0, "percentage": 0}
@@ -474,6 +612,8 @@ async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: s
 
         # 2. Git Init (Slower, background)
         await asyncio.to_thread(_git_init_sync, temp_dir)
+        workspace_index = _build_workspace_file_index(temp_dir)
+        update_job_log(job_id, f"[Trace] Workspace index ready: {len(workspace_index.get('files_by_rel', {}))} files")
         
         # Sonar Scan
         
@@ -549,6 +689,14 @@ OUTPUT REQUIREMENTS:
              try:
                  ai_handler = LiteLLMAIHandler()
              except: pass
+
+        # Hard fail if LLM is unavailable; do not pretend success with empty fixes.
+        if ai_handler is None:
+            err_msg = "AI handler unavailable: set GROQ_API_KEY (or configured model provider key) on AI Core."
+            update_job_log(job_id, err_msg)
+            JOBS[job_id]["status"] = "failed"
+            JOBS[job_id]["error"] = err_msg
+            return
         
         fixes = []
         limit_reached = False
@@ -560,10 +708,13 @@ OUTPUT REQUIREMENTS:
             files_to_issues = {}
             if sonar_findings:
                 for issue in sonar_report_raw:
-                    comp = issue.get('component', '').split(':')[-1]
-                    if comp:
-                        if comp not in files_to_issues: files_to_issues[comp] = []
-                        files_to_issues[comp].append(issue)
+                    issue_file = _extract_issue_filename(issue)
+                    if issue_file:
+                        if issue_file not in files_to_issues:
+                            files_to_issues[issue_file] = []
+                        files_to_issues[issue_file].append(issue)
+                    else:
+                        update_job_log(job_id, f"[Trace] Issue missing filename keys: {list(issue.keys())}")
 
             total_files = min(len(files_to_issues), 20) # Boost to 20 for full coverage
             update_job_progress(job_id, current_file="Starting...", processed=0, total=total_files)
@@ -597,20 +748,12 @@ OUTPUT REQUIREMENTS:
                 # Incremental Limit: Process up to 20 files (CodeRabbit Scale)
                 if processed_count >= 20: break
 
-                full_path = os.path.join(temp_dir, filename)
-                if not os.path.exists(full_path):
-                    # [BlackboxTester] Path Mismatch Fallback (Windows Zip on Linux)
-                    # Sometims zips from Windows clients extract as files with backslashes in the name
-                    # instead of directories. Check for that variant.
-                    backslashed_name = filename.replace('/', '\\')
-                    fallback_path = os.path.join(temp_dir, backslashed_name)
-                    
-                    if os.path.exists(fallback_path):
-                        get_logger().info(f"[FLOW TRACE] Found file via Windows-path fallback: {fallback_path}")
-                        full_path = fallback_path
-                    else:
-                        get_logger().warning(f"[FLOW TRACE] File not found on disk: {full_path} (filename: {filename})")
-                        continue
+                full_path, resolve_mode, resolve_details = _resolve_workspace_file(temp_dir, filename, workspace_index)
+                if not full_path:
+                    get_logger().warning(f"[FLOW TRACE] File resolution failed for issue path: {filename} details={resolve_details}")
+                    update_job_log(job_id, f"[Trace] Skip unresolved file: {filename}")
+                    continue
+                update_job_log(job_id, f"[Trace] Resolved `{filename}` via {resolve_mode}")
                 
                 # [BlackboxTester] Filter out "trash" (Markdown, Text, Configs) - Focus on Logic
                 # [BlackboxTester] Filter out "trash" (Markdown, Text, Binaries) - Include Configs for Logic Check
@@ -720,6 +863,14 @@ Identify CRITICAL issues to fix. Return JSON:
                         print(f"[FLOW TRACE] Snippet extracted: lines {start_line}-{end_line} ({len(snippet)} chars)")
                         
                         update_job_log(job_id, f"  → Fixing: {issue_msg[:50]}... (line {issue_line})")
+
+                        # Deterministic fallback for common secret findings.
+                        fallback_fixed = _apply_secret_fallback_fix(filename, current_content, issue)
+                        if fallback_fixed and fallback_fixed != current_content:
+                            current_content = fallback_fixed
+                            file_fix_applied = True
+                            update_job_log(job_id, "  + Applied deterministic secret redaction fallback.")
+                            continue
                         
                         system_prompt = f"""You are an expert Security Fixer.
 Fix ONLY the specific vulnerability described below. Do not refactor unrelated code.

@@ -1,0 +1,6 @@
+AI_CORE_URL=https://essentials-fame-skilled-leonard.trycloudflare.com
+AI_REVIEW_WEBHOOK_URL=https://essentials-fame-skilled-leonard.trycloudflare.com/api/v1/github_webhooks
+SONAR_SERVICE_URL=https://tub-depends-costs-registered.trycloudflare.com
+SONARQUBE__URL=https://bridal-administrator-counting-versus.trycloudflare.com
+SONARQUBE_URL=https://bridal-administrator-counting-versus.trycloudflare.com
+ENABLE_MOCK_REVIEW=false

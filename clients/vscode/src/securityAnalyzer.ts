@@ -221,9 +221,13 @@ export class SecurityAnalyzer {
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
                 const statusResponse = await fetch(`${backendUrl}/api/v1/ide/job_status/${job_id}`);
-                if (statusResponse.status === 404) {
-                    // Backward-compatibility: old gateway versions cannot poll analyze_unified jobs.
-                    onProgress({ state: 'running', percentage: 15, detail: 'Gateway status fallback: switching context sync mode' });
+                if ([404, 502, 503, 504].includes(statusResponse.status)) {
+                    // Backward-compatibility + transient proxy failures: fallback to async review mode.
+                    onProgress({
+                        state: 'running',
+                        percentage: 15,
+                        detail: `Gateway status fallback (${statusResponse.status}): switching context sync mode`
+                    });
                     await this._startLegacyContextBuild(backendUrl, content, onProgress);
                     return;
                 }

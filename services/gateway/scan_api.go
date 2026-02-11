@@ -37,11 +37,12 @@ type ScanResult struct {
 }
 
 type SonarIssue struct {
-	File     string `json:"file"`
-	Line     int    `json:"line"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-	Rule     string `json:"rule"`
+	File      string `json:"file"`
+	Component string `json:"component,omitempty"`
+	Line      int    `json:"line"`
+	Severity  string `json:"severity"`
+	Message   string `json:"message"`
+	Rule      string `json:"rule"`
 }
 
 type FixProposal struct {
@@ -492,6 +493,7 @@ func (app *App) processScanJob(jobID string, zipPath string, gitLog string, gitD
 				log.Printf("[gateway-job:%s] poll status=%s ai_job_id=%s", jobID, data.Status, aiJobID)
 
 				if data.Status == "completed" {
+					normalizeScanResult(data.Result)
 					j.Result = data.Result
 					log.Printf("[gateway-job:%s] completed successfully", jobID)
 					jobsMut.Unlock()
@@ -508,6 +510,18 @@ func (app *App) processScanJob(jobID string, zipPath string, gitLog string, gitD
 				return // Job killed locally?
 			}
 			jobsMut.Unlock()
+		}
+	}
+}
+
+func normalizeScanResult(result *ScanResult) {
+	if result == nil {
+		return
+	}
+	for i := range result.SonarData {
+		if strings.TrimSpace(result.SonarData[i].File) == "" && strings.TrimSpace(result.SonarData[i].Component) != "" {
+			parts := strings.Split(result.SonarData[i].Component, ":")
+			result.SonarData[i].File = parts[len(parts)-1]
 		}
 	}
 }

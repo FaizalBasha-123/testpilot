@@ -1,1 +1,1 @@
-dummy content
+const key = "AIzaSyA1234567890EXAMPLEKEY";
