@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Box,
@@ -12,6 +12,7 @@ import {
   User,
   LogOut
 } from 'lucide-react';
+import { BACKEND_URL, fetchWithToken, MeResponse } from '../../lib/api';
 
 interface NavItem {
   name: string;
@@ -32,7 +33,23 @@ const navigation: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [username] = useState('FaizalBasha-123');
+  const [username, setUsername] = useState('Workspace User');
+
+  useEffect(() => {
+    const token = localStorage.getItem('tp_token');
+    if (!token) {
+      return;
+    }
+    fetchWithToken<MeResponse>('/api/me', token)
+      .then((me) => {
+        if (me.login) {
+          setUsername(me.login);
+        }
+      })
+      .catch(() => {
+        // Keep fallback name; user can still navigate.
+      });
+  }, []);
 
   return (
     <div className="w-64 bg-[#0d1117] border-r border-gray-800 min-h-screen flex flex-col">
@@ -75,7 +92,15 @@ export default function Sidebar() {
         <div className="bg-[#161b22] rounded-lg p-3 mb-3">
           <p className="text-xs text-gray-400 mb-1">Get started with</p>
           <p className="text-sm font-semibold text-white mb-2">TestPilot</p>
-          <p className="text-xs text-gray-500 mb-3">Up Next: Checkout your first TestPilot review</p>
+          <p className="text-xs text-gray-500 mb-3">Up Next: connect repositories and run your first review</p>
+          <a
+            href={`${BACKEND_URL}/auth/install`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex text-xs text-blue-400 hover:text-blue-300"
+          >
+            Install GitHub App
+          </a>
         </div>
         <button
           onClick={() => {
