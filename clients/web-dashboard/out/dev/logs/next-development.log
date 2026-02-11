@@ -1,5 +1,8 @@
-[00:00:02.041] Server  LOG     ✓ Ready in 1408ms
-[00:00:06.800] Server  LOG     ○ Compiling / ...
-[00:00:08.438] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:12.733] Server  LOG     ✓ Compiled in 13ms
-[00:00:13.268] Server  LOG     ✓ Compiled in 502ms
+[00:00:01.239] Server  LOG     ✓ Ready in 810ms
+[00:14:07.136] Server  ERROR   ⨯ Error: ENOENT: no such file or directory, open 'D:\blackboxtester-mvp\clients\web-dashboard\out\dev\server\app\page\build-manifest.json'
+[00:14:07.161] Server  ERROR   ⨯ Error: ENOENT: no such file or directory, open 'D:\blackboxtester-mvp\clients\web-dashboard\out\dev\server\pages\_app\build-manifest.json'
+[00:14:07.195] Server  ERROR   Error: ENOENT: no such file or directory, open 'D:\blackboxtester-mvp\clients\web-dashboard\out\dev\server\app\page\build-manifest.json'
+[00:14:07.232] Server  ERROR   ⨯ Error: ENOENT: no such file or directory, open 'D:\blackboxtester-mvp\clients\web-dashboard\out\dev\server\pages\_app\build-manifest.json'
+[00:14:07.258] Server  ERROR   Error: ENOENT: no such file or directory, open 'D:\blackboxtester-mvp\clients\web-dashboard\out\dev\server\pages\_app\build-manifest.json'
+[00:00:56.593] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:21.656] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

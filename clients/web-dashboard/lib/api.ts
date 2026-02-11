@@ -1,6 +1,10 @@
+const configuredBackend = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
+const runtimeOrigin = typeof window !== "undefined" ? window.location.origin : "";
+
 export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  // Canonical gateway endpoint for this codebase state.
+  configuredBackend ||
+  runtimeOrigin ||
+  // Canonical gateway endpoint fallback for this codebase state.
   "https://testpilot-64v5.onrender.com";
 
 export type Repo = {
@@ -24,6 +28,13 @@ export type GatewayStatus = {
   gateway: {
     reachable: boolean;
     mock_mode: boolean;
+  };
+  runtime?: {
+    git?: {
+      installed: boolean;
+      version?: string;
+      path?: string;
+    };
   };
   services: ServiceStatus[];
   capabilities: string[];

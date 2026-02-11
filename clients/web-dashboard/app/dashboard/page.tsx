@@ -12,6 +12,8 @@ import {
   ExternalLink,
   Github,
   Rocket,
+  Server,
+  Terminal,
   Shield,
   Workflow,
   Zap,
@@ -120,6 +122,18 @@ export default function DashboardPage() {
             hint="Gateway Routing"
             icon={<Cpu size={20} className="text-orange-400" />}
           />
+          <MetricCard
+            title="Git Runtime"
+            value={
+              loading
+                ? '...'
+                : status?.runtime?.git?.installed
+                  ? 'INSTALLED'
+                  : 'MISSING'
+            }
+            hint={status?.runtime?.git?.version || 'Gateway host runtime'}
+            icon={<Terminal size={20} className="text-emerald-400" />}
+          />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-10">
@@ -226,6 +240,12 @@ export default function DashboardPage() {
                   <div className="flex justify-between">
                     <span>Version</span>
                     <span className="text-gray-200">v1.2.0-ent</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span>Git Binary</span>
+                    <span className="text-gray-200 truncate max-w-[220px] text-right">
+                      {status?.runtime?.git?.path || (loading ? '...' : 'Not detected')}
+                    </span>
                   </div>
                 </div>
               </div>

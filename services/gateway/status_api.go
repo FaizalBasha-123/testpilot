@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -14,6 +15,12 @@ type ServiceStatus struct {
 	Reachable  bool   `json:"reachable"`
 	StatusCode int    `json:"status_code,omitempty"`
 	Error      string `json:"error,omitempty"`
+}
+
+type RuntimeGitStatus struct {
+	Installed bool   `json:"installed"`
+	Version   string `json:"version,omitempty"`
+	Path      string `json:"path,omitempty"`
 }
 
 func (a *App) handleMe(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +57,9 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"reachable": true,
 			"mock_mode": a.cfg.EnableMockReview,
 		},
+		"runtime": map[string]any{
+			"git": detectGitRuntime(),
+		},
 		"services": []ServiceStatus{ai, sonar, webhook},
 		"capabilities": []string{
 			"github_oauth",
@@ -60,6 +70,25 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"job_cancel_supported",
 		},
 	})
+}
+
+func detectGitRuntime() RuntimeGitStatus {
+	result := RuntimeGitStatus{Installed: false}
+	path, err := exec.LookPath("git")
+	if err != nil {
+		return result
+	}
+
+	result.Path = path
+	out, err := exec.Command("git", "--version").Output()
+	if err != nil {
+		result.Installed = true
+		return result
+	}
+
+	result.Installed = true
+	result.Version = strings.TrimSpace(string(out))
+	return result
 }
 
 func checkService(name, baseURL string) ServiceStatus {
