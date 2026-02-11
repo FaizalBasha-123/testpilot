@@ -1,12 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { CheckCircle, CircleAlert, Github } from "lucide-react";
+import { BACKEND_URL, GatewayStatus } from "../../lib/api";
+
 const backend =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  // Canonical gateway endpoint for this codebase state.
-  // Do not fallback to localhost gateway here.
-  'https://testpilot-64v5.onrender.com';
+  BACKEND_URL;
 
 export default function LoginPage() {
+  const [status, setStatus] = useState<GatewayStatus | null>(null);
+
+  useEffect(() => {
+    fetch(`${backend}/api/status`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setStatus(data))
+      .catch(() => {
+        // Leave status unavailable; login can still continue.
+      });
+  }, []);
+
   const handleLogin = () => {
     window.location.href = '/auth/loading';
     setTimeout(() => {
@@ -21,14 +33,30 @@ export default function LoginPage() {
         <div className="login-column">
           <span className="tag">Secure OAuth</span>
           <h1 className="hero-title" style={{ marginTop: 6 }}>
-            Welcome back, builder.
+            Enterprise Sign-In
           </h1>
           <p className="muted" style={{ lineHeight: 1.7 }}>
-            Sign in with GitHub to install the TestPilot App, connect your
-            repositories, and watch the AI agent open pull requests in seconds.
+            Sign in with GitHub to activate TestPilot across repositories, route PR webhooks through the Render gateway, and execute real AI + Sonar review pipelines.
           </p>
+          <div className="rounded-xl border border-gray-700 bg-[#0f172a] p-4 text-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-400">Gateway Endpoint</span>
+              <span className="text-gray-200 break-all">{backend}</span>
+            </div>
+            <div className="flex items-center">
+              {status?.gateway?.reachable ? (
+                <CheckCircle size={14} className="text-green-400 mr-2" />
+              ) : (
+                <CircleAlert size={14} className="text-yellow-400 mr-2" />
+              )}
+              <span className="text-gray-300">
+                {status?.gateway?.reachable ? "Gateway reachable" : "Status unknown (login still available)"}
+              </span>
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <button className="button" onClick={handleLogin}>
+              <Github size={16} />
               Login with GitHub
             </button>
             <a className="button secondary" href="/">
@@ -37,8 +65,9 @@ export default function LoginPage() {
           </div>
           <div className="pill-row">
             <span className="pill">No passwords</span>
-            <span className="pill">One-click install</span>
-            <span className="pill">Instant PRs</span>
+            <span className="pill">GitHub App installation</span>
+            <span className="pill">Render gateway control plane</span>
+            <span className="pill">Real Sonar + AI reviews</span>
           </div>
         </div>
         <div className="login-illustration">

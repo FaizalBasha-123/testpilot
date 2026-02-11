@@ -777,6 +777,20 @@ class PRCodeSuggestions:
                 pr_body += "No suggestions found to improve this PR."
                 return pr_body
 
+            # Compact summary to keep PR conversation readable.
+            labels = set()
+            for s in data.get('code_suggestions', []):
+                label = str(s.get('label', '')).strip().strip("'").strip('"')
+                if label:
+                    labels.add(label.lower())
+            total_suggestions = len(data.get('code_suggestions', []))
+            pr_body += (
+                "### TestPilot Fix Summary\n\n"
+                f"- **What TestPilot fixed/proposed:** {total_suggestions} suggestion(s) across {len(labels)} category(ies).\n"
+                "- **Apply flow:** Use the generated suggestions as the actionable fix set for this PR.\n"
+                "- **Conclusion:** Apply the relevant suggestions and re-run review for a clean merge signal.\n\n"
+            )
+
             if get_settings().config.is_auto_command:
                 pr_body += "Explore these optional code suggestions:\n\n"
 

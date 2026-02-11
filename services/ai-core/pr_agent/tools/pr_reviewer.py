@@ -25,6 +25,7 @@ from pr_agent.log import get_logger
 from pr_agent.servers.help import HelpMessage
 from pr_agent.tools.ticket_pr_compliance_check import (
     extract_and_cache_pr_tickets, extract_tickets)
+from pr_agent.algo.utils.text import is_value_no
 
 
 class PRReviewer:
@@ -293,6 +294,11 @@ class PRReviewer:
                                                git_provider=self.git_provider,
                                                files=self.git_provider.get_diff_files())
 
+        # Add a compact top summary so PR threads stay readable and consistent.
+        summary_block = self._build_structured_review_summary(data)
+        if summary_block:
+            markdown_text = summary_block + "\n\n" + markdown_text
+
         # Add help text if gfm_markdown is supported
         if self.git_provider.is_supported("gfm_markdown") and get_settings().pr_reviewer.enable_help_text:
             markdown_text += "<hr>\n\n<details> <summary><strong>💡 Tool usage guide:</strong></summary><hr> \n\n"
@@ -310,6 +316,59 @@ class PRReviewer:
             markdown_text = ""
 
         return markdown_text
+
+    def _build_structured_review_summary(self, data: dict) -> str:
+        try:
+            review = data.get("review", {}) if isinstance(data, dict) else {}
+            if not review:
+                return ""
+
+            commit_messages = self.git_provider.get_commit_messages() or ""
+            commit_lines = [line.strip("-* \t") for line in commit_messages.splitlines() if line.strip()]
+            commit_lines = commit_lines[:3]
+            if commit_lines:
+                user_committed = "; ".join(commit_lines)
+            else:
+                user_committed = self.git_provider.pr.title
+
+            key_issues = review.get("key_issues_to_review", [])
+            issue_count = len(key_issues) if isinstance(key_issues, list) else 0
+
+            security_raw = review.get("security_concerns", "")
+            if is_value_no(security_raw):
+                security_text = "No explicit security concern."
+            else:
+                security_text = "Security concern(s) flagged in review details."
+
+            tests_raw = review.get("relevant_tests", "")
+            if is_value_no(tests_raw):
+                tests_text = "No relevant tests detected."
+            else:
+                tests_text = "Relevant tests detected."
+
+            effort_raw = str(review.get("estimated_effort_to_review_[1-5]", "")).strip()
+            effort_text = effort_raw.split(",")[0].strip() if effort_raw else "n/a"
+
+            testpilot_found = (
+                f"{issue_count} key issue(s); {security_text} {tests_text} "
+                f"Estimated review effort: {effort_text}/5."
+            )
+            testpilot_fixed = "Fixes are proposed in the `PR Code Suggestions` comment for direct apply/reject flow."
+            if issue_count == 0 and is_value_no(security_raw):
+                conclusion = "No high-risk blockers detected; merge can proceed after normal maintainer checks."
+            else:
+                conclusion = "Address the suggested fixes first, then merge."
+
+            return (
+                "## TestPilot Executive Summary\n\n"
+                f"- **What user committed:** {user_committed}\n"
+                f"- **What TestPilot found:** {testpilot_found}\n"
+                f"- **What TestPilot fixed/proposed:** {testpilot_fixed}\n"
+                f"- **Conclusion:** {conclusion}"
+            )
+        except Exception as e:
+            get_logger().warning(f"Failed to build structured review summary: {e}")
+            return ""
 
     def _get_user_answers(self) -> Tuple[str, str]:
         """

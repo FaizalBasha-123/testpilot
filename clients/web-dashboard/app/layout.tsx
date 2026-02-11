@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "TestPilot AI Agent",
-  description: "Hackathon demo for AI PR automation",
+  title: "TestPilot Enterprise",
+  description: "Enterprise AI code review control plane with GitHub App, Sonar, and VS Code integration.",
 };
 
 export default function RootLayout({

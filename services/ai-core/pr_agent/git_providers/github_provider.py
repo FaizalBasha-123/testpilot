@@ -833,6 +833,9 @@ class GithubProvider(GitProvider):
                 app_id = get_settings().github.app_id
             except AttributeError as e:
                 raise ValueError("GitHub app ID and private key are required when using GitHub app deployment") from e
+            app_id = str(app_id).strip() if app_id is not None else ""
+            if not app_id:
+                raise ValueError("GitHub app ID must be a non-empty string when using GitHub app deployment")
             if not self.installation_id:
                 raise ValueError("GitHub app installation ID is required when using GitHub app deployment")
             auth = AppAuthentication(app_id=app_id, private_key=private_key,

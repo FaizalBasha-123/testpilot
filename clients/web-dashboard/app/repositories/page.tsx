@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { Box, ExternalLink, Lock, Globe, CheckCircle } from 'lucide-react';
-
-const backend = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+import { BACKEND_URL } from '../../lib/api';
 
 type Repo = {
   id: number;
@@ -16,7 +15,7 @@ type Repo = {
 
 export default function RepositoriesPage() {
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [installUrl, setInstallUrl] = useState<string>(`${backend}/auth/install`);
+  const [installUrl, setInstallUrl] = useState<string>(`${BACKEND_URL}/auth/install`);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +25,7 @@ export default function RepositoriesPage() {
       return;
     }
 
-    fetch(`${backend}/api/repos`, {
+    fetch(`${BACKEND_URL}/api/repos`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -34,7 +33,7 @@ export default function RepositoriesPage() {
       .then((res) => res.json())
       .then((data) => {
         setRepos(data.repos || []);
-        setInstallUrl(`${backend}/auth/install`);
+        setInstallUrl(`${BACKEND_URL}/auth/install`);
         setLoading(false);
       })
       .catch(() => setLoading(false));
