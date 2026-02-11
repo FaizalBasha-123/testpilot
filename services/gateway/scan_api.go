@@ -29,6 +29,8 @@ type ScanJob struct {
 	Result    *ScanResult `json:"result,omitempty"`
 	Error     string      `json:"error,omitempty"`
 	CreatedAt time.Time
+	// Tracks how many logs from AI-core have already been synced into Logs.
+	AICoreLogCursor int `json:"-"`
 }
 
 type ScanResult struct {
@@ -104,6 +106,7 @@ func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
 		Status:    "pending",
 		Logs:      []string{"Job created", fmt.Sprintf("Received file: %s (%d bytes)", header.Filename, header.Size)},
 		CreatedAt: time.Now(),
+		AICoreLogCursor: 0,
 	}
 
 	jobsMut.Lock()
@@ -478,16 +481,21 @@ func (app *App) processScanJob(jobID string, zipPath string, gitLog string, gitD
 			}
 			statusResp.Body.Close()
 
-			// Sync Logs
+			// Sync Logs (append all new AI-core log lines in order, not just last line)
 			jobsMut.Lock()
 			if j, ok := jobs[jobID]; ok {
-				// Naive log sync: just replace or append new ones?
-				// Let's just take the last log from AI Core if it's new
 				if len(data.Logs) > 0 {
-					lastLog := data.Logs[len(data.Logs)-1]
-					if len(j.Logs) == 0 || j.Logs[len(j.Logs)-1] != lastLog {
-						j.Logs = append(j.Logs, lastLog)
+					if j.AICoreLogCursor < 0 {
+						j.AICoreLogCursor = 0
 					}
+					// If AI-core log array was rotated/reset, recover safely.
+					if j.AICoreLogCursor > len(data.Logs) {
+						j.AICoreLogCursor = 0
+					}
+					for idx := j.AICoreLogCursor; idx < len(data.Logs); idx++ {
+						j.Logs = append(j.Logs, data.Logs[idx])
+					}
+					j.AICoreLogCursor = len(data.Logs)
 				}
 				j.Status = data.Status
 				log.Printf("[gateway-job:%s] poll status=%s ai_job_id=%s", jobID, data.Status, aiJobID)
