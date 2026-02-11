@@ -149,6 +149,12 @@ services:
     volumes:
       - ./services/ai-core/pr_agent:/app/pr_agent  # Hot Reload
       - /tmp/testpilot:/tmp/testpilot
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
     networks:
       - testpilot-network

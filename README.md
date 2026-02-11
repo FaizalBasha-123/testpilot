@@ -18,6 +18,7 @@ TestPilot is an intelligent coding assistant that integrates deeply with your de
 ## 📦 Deployment
 
 For detailed deployment instructions, please see [DEPLOYMENT.md](DEPLOYMENT.md).
+For laptop shipping with local Docker backends and Render gateway, see [RUNBOOK_LOCAL_WITH_RENDER_GATEWAY.md](RUNBOOK_LOCAL_WITH_RENDER_GATEWAY.md).
 
 ### Quick Start (Render + Vercel)
 1. **Fork** this repository.

@@ -315,20 +315,16 @@ func (app *App) processScanJob(jobID string, zipPath string, gitLog string, gitD
 		defer pw.Close()
 		defer writer.Close()
 
-		if gitLog != "" {
-			if err := writer.WriteField("git_log", gitLog); err != nil {
-				log.Printf("[gateway-job:%s] failed to add git_log field: %v", jobID, err)
-			}
+		// Always forward context fields (even if empty) so AI Core
+		// receives "" instead of None from Form(None) defaults.
+		if err := writer.WriteField("git_log", gitLog); err != nil {
+			log.Printf("[gateway-job:%s] failed to add git_log field: %v", jobID, err)
 		}
-		if gitDiff != "" {
-			if err := writer.WriteField("git_diff", gitDiff); err != nil {
-				log.Printf("[gateway-job:%s] failed to add git_diff field: %v", jobID, err)
-			}
+		if err := writer.WriteField("git_diff", gitDiff); err != nil {
+			log.Printf("[gateway-job:%s] failed to add git_diff field: %v", jobID, err)
 		}
-		if forceReview != "" {
-			if err := writer.WriteField("force_review", forceReview); err != nil {
-				log.Printf("[gateway-job:%s] failed to add force_review field: %v", jobID, err)
-			}
+		if err := writer.WriteField("force_review", forceReview); err != nil {
+			log.Printf("[gateway-job:%s] failed to add force_review field: %v", jobID, err)
 		}
 
 		// Add file

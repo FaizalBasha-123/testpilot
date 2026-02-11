@@ -542,7 +542,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         } catch (e) {
             vscode.window.showErrorMessage(`Failed to apply fix: ${String(e)}`);
         }
-        
+
         this._updateView();
     }
 
@@ -553,7 +553,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         if (!workspacePath) return;
 
         const filePath = path.join(workspacePath, filename);
-        
+
         try {
             if (this._stagingManager.isStaged(filePath)) {
                 await this._stagingManager.rejectChange(filePath);
@@ -567,7 +567,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         } catch (e) {
             vscode.window.showErrorMessage(`Failed to reject fix: ${String(e)}`);
         }
-        
+
         this._updateView();
     }
 
@@ -956,10 +956,10 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
 
     private _formatDiffHtml(unifiedDiff: string): string {
         if (!unifiedDiff) return '<div style="padding: 14px; color: var(--vscode-descriptionForeground, #888);">No diff available</div>';
-        
+
         const lines = unifiedDiff.split('\n');
         let html = '<div style="font-family: monospace; font-size: 12px; line-height: 1.4;">';
-        
+
         for (const line of lines) {
             if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
                 // Header lines
@@ -975,7 +975,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                 html += `<div style="color: var(--vscode-foreground, #ccc); padding: 0 14px;">${this._escapeHtml(line)}</div>`;
             }
         }
-        
+
         html += '</div>';
         return html;
     }

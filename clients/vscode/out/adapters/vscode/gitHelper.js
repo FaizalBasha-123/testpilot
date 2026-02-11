@@ -425,20 +425,24 @@ class GitHelper {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const cp = require('child_process');
+                const command = `git show ${sha} --stat --patch`;
+                console.log(`[GitHelper] getCommitDiff running: ${command} in ${workspacePath}`);
                 return new Promise((resolve) => {
-                    cp.exec(`git show ${sha} --stat --patch`, { cwd: workspacePath, maxBuffer: 1024 * 1024 * 5 }, (err, stdout) => {
+                    cp.exec(command, { cwd: workspacePath, maxBuffer: 1024 * 1024 * 5 }, (err, stdout) => {
                         if (err) {
-                            console.error('[GitHelper] getCommitDiff failed:', err);
-                            resolve('');
+                            console.error(`[GitHelper] getCommitDiff FAILED for sha=${sha}:`, err.message);
+                            resolve(`[git-diff-error] sha=${sha} error=${err.message}`);
                             return;
                         }
-                        resolve(stdout || '');
+                        const result = stdout || '';
+                        console.log(`[GitHelper] getCommitDiff OK sha=${sha} chars=${result.length}`);
+                        resolve(result);
                     });
                 });
             }
             catch (e) {
                 console.error('[GitHelper] getCommitDiff error:', e);
-                return '';
+                return `[git-diff-error] sha=${sha} error=${e.message}`;
             }
         });
     }
@@ -449,21 +453,24 @@ class GitHelper {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const cp = require('child_process');
+                const command = `git show -s --format="%H%n%an%n%ad%n%s%n%b" ${sha}`;
+                console.log(`[GitHelper] getCommitLog running: ${command} in ${workspacePath}`);
                 return new Promise((resolve) => {
-                    const command = `git show -s --format="%H%n%an%n%ad%n%s%n%b" ${sha}`;
                     cp.exec(command, { cwd: workspacePath, maxBuffer: 1024 * 1024 }, (err, stdout) => {
                         if (err) {
-                            console.error('[GitHelper] getCommitLog failed:', err);
-                            resolve('');
+                            console.error(`[GitHelper] getCommitLog FAILED for sha=${sha}:`, err.message);
+                            resolve(`[git-log-error] sha=${sha} error=${err.message}`);
                             return;
                         }
-                        resolve(stdout || '');
+                        const result = stdout || '';
+                        console.log(`[GitHelper] getCommitLog OK sha=${sha} chars=${result.length}`);
+                        resolve(result);
                     });
                 });
             }
             catch (e) {
                 console.error('[GitHelper] getCommitLog error:', e);
-                return '';
+                return `[git-log-error] sha=${sha} error=${e.message}`;
             }
         });
     }

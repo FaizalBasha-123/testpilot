@@ -123,54 +123,10 @@ def _trace_headers(request: Request) -> dict:
         "user_agent": request.headers.get("user-agent", ""),
     }
 
-@router.post("/api/v1/ide/review_repo_async")
-async def review_repo_async(
-    request: Request,
-    file: UploadFile = File(...),
-    force_review: str = Form(None),
-    background_tasks: BackgroundTasks = None
-):
-    """
-    Async Endpoint: Accepts a ZIP of the repo, starts analysis in background.
-    Returns: {"job_id": "uuid"}
-    """
-    trace = _trace_headers(request)
-    get_logger().info(
-        "[ide-review-async:v1] received upload",
-        artifact={"trace": trace, "filename": file.filename},
-    )
-
-    job_id = str(uuid.uuid4())
-    JOBS[job_id] = {
-        "status": "pending",
-        "logs": ["Job Queued..."],
-        "progress": {"current_file": "Uploading...", "processed": 0, "total": 0},
-        "created_at": time.time()
-    }
-    
-    # Save Uploaded Zip
-    temp_dir = tempfile.mkdtemp(prefix="blackbox_scan_")
-    zip_path = os.path.join(temp_dir, "repo.zip")
-    
-    get_logger().info(f"Job {job_id}: Receiving ZIP...")
-    
-    with open(zip_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-    get_logger().info(
-        f"[ide-review-async:v1] job={job_id} persisted zip bytes={len(content)} path={zip_path}"
-    )
-        
-    JOBS[job_id]["logs"].append(f"ZIP received ({len(content)} bytes)")
-    
-    # Start Background Task
-    force_flag = str(force_review).lower() in ["1", "true", "yes", "on"]
-    if background_tasks:
-        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir, None, None, force_flag)
-    else:
-        get_logger().warning(f"[ide-review-async:v1] job={job_id} missing background_tasks; task will not start")
-        
-    return {"job_id": job_id}
+# [REMOVED] Legacy v1 review_repo_async handler.
+# It hardcoded None for git_log/git_diff, shadowing the v2 handler at the
+# bottom of this file which properly accepts them as Form fields.
+# See: v2 handler @router.post("/api/v1/ide/review_repo_async") below.
 
 @router.get("/api/v1/ide/job_status/{job_id}")
 async def get_job_status(job_id: str):
@@ -527,15 +483,18 @@ async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: s
     # [Phoenix] Debug Logging for Context
     
     # [Phoenix] Debug Logging for Context
-    if git_log:
+    has_log = git_log is not None and git_log.strip() != "" and not git_log.startswith("[git-log-error]")
+    has_diff = git_diff is not None and git_diff.strip() != "" and not git_diff.startswith("[git-diff-error]")
+    
+    if has_log:
         update_job_log(job_id, f"Received Git Log ({len(git_log)} chars)")
     else:
-        update_job_log(job_id, "No Git Log received")
+        update_job_log(job_id, f"No Git Log received (value={repr(git_log[:80] if git_log else None)})")
         
-    if git_diff:
+    if has_diff:
         update_job_log(job_id, f"Received Git Diff ({len(git_diff)} chars)")
     else:
-        update_job_log(job_id, "No Git Diff received; continuing security scan")
+        update_job_log(job_id, f"No Git Diff received (value={repr(git_diff[:80] if git_diff else None)}); continuing security scan")
     if force_review:
         update_job_log(job_id, "Force review enabled (full scan)")
     
@@ -585,7 +544,7 @@ async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: s
         # [BlackboxTester] Feature: PR Summaries & Walkthroughs
         # Generate a high-level summary of intent BEFORE fixing bugs.
         pr_walkthrough = ""
-        if (git_log or git_diff) and ai_handler:
+        if (has_log or has_diff) and ai_handler:
             update_job_log(job_id, "Generating PR Walkthrough...")
             try:
                 # Truncate context for summary to avoid limits
@@ -818,20 +777,25 @@ Identify CRITICAL issues to fix. Return JSON:
                         system_prompt = f"""You are an expert Security Fixer.
 Fix ONLY the specific vulnerability described below. Do not refactor unrelated code.
 
+RULES:
+1. Replace hardcoded secrets with environment variable reads (e.g. process.env.X or os.environ.get("X")).
+2. Do NOT create .env files with REAL secret values. Use placeholders like "your_db_password_here".
+3. If fixing secret exposure, suggest adding .env to .gitignore via additional_edits.
+4. Each additional_edits entry must have a unique filename. Do NOT repeat filenames from previous fixes.
+
 OUTPUT FORMAT: Return a JSON object with the fixed snippet.
 IMPORTANT: The 'fixed_snippet' must contain ONLY clean, valid code. Do NOT include line numbers (e.g. "1 |") or prefixes.
 
-If you are moving secrets to an environment file (e.g. .env), you MUST provide the content for that file in 'additional_edits'.
 Structure:
 {{
     "fixed_snippet": "THE FIXED CODE...",
     "issue_line": 123,
     "issue_message": "...",
     "additional_edits": [
-        {{ "filename": ".env", "content": "KEY=VALUE\\nKEY2=VALUE2" }}
+        {{ "filename": ".env.example", "content": "DB_PASSWORD=your_db_password_here" }},
+        {{ "filename": ".gitignore", "content": ".env\\n.env.local" }}
     ]
-}}
-"""
+}}"""
                         
                         # [BlackboxTester] Context Engineering: Build CodeGraph (Lazy Load)
                         if not codegraph_context:
@@ -929,37 +893,49 @@ Return ONLY valid JSON with the fixed code for this snippet:
                                 file_fix_applied = True
                                 get_logger().info(f"[FLOW TRACE] Fix applied to in-memory content.")
 
-                                # [BlackboxTester] Handle Additional Edits (e.g. .env)
+                                # [BlackboxTester] Handle Additional Edits (e.g. .env, .gitignore)
+                                # Deduplicated: merge content if same filename already proposed
                                 extra_edits = data.get("additional_edits", [])
                                 for edit in extra_edits:
                                     ef_name = edit.get("filename")
                                     ef_content = edit.get("content")
                                     if ef_name and ef_content:
-                                        # Write to temp (simulate apply)
-                                        # TODO: Merge logic? For now, primitive overwrite/create
-                                        # [BlackboxTester] Context-Aware .env Placement
-                                        # User Request: .env must be in the same parent folder as the modified file
-                                        if ef_name == ".env":
+                                        # Context-Aware .env/.env.example Placement
+                                        if ef_name in (".env", ".env.example"):
                                             parent_dir = os.path.dirname(filename)
                                             if parent_dir:
-                                                ef_name = os.path.join(parent_dir, ef_name).replace("\\", "/") # Enforce forward slashes
+                                                ef_name = os.path.join(parent_dir, ef_name).replace("\\", "/")
                                             
                                         ef_path = os.path.join(temp_dir, ef_name)
                                         
-                                        # If .env, maybe append?
-                                        # But let's stick to simple "Create/Overwrite" logic matching Kilo's "Write File"
+                                        # Dedup: Check if we already have a fix for this filename
+                                        existing_fix = next((f for f in fixes if f["filename"] == ef_name), None)
+                                        if existing_fix:
+                                            # Merge: append new env vars that aren't already present
+                                            existing_lines = set(existing_fix["new_content"].splitlines())
+                                            new_lines = [l for l in ef_content.splitlines() if l not in existing_lines]
+                                            if new_lines:
+                                                merged = existing_fix["new_content"] + "\n" + "\n".join(new_lines)
+                                                existing_fix["new_content"] = merged
+                                                existing_fix["unified_diff"] = f"--- /dev/null\n+++ {ef_name}\n@@ -0,0 +1 @@\n+{merged}"
+                                                update_job_log(job_id, f"Merged new entries into existing {ef_name}")
+                                            else:
+                                                update_job_log(job_id, f"Skipped duplicate {ef_name} (already proposed)")
+                                            continue
+                                        
+                                        # Write to temp dir
                                         with open(ef_path, "w") as ef:
                                             ef.write(ef_content)
                                         
                                         msg = f"Created/Updated auxiliary file: {ef_name}"
                                         update_job_log(job_id, msg)
                                             
-                                        # Add to Fixes List immediately
+                                        # Add to Fixes List
                                         fixes.append({
                                             "filename": ef_name,
                                             "new_content": ef_content,
-                                            "unified_diff": f"--- /dev/null\n+++ {ef_name}\n@@ -0,0 +1 @@\n+{ef_content}", # Fake diff for new file
-                                            "original_content": "", # New file
+                                            "unified_diff": f"--- /dev/null\n+++ {ef_name}\n@@ -0,0 +1 @@\n+{ef_content}",
+                                            "original_content": "",
                                             "issues_fixed": 0
                                         })
                                         summary_lines.append(f"- Created/Updated `{ef_name}`")
@@ -1056,8 +1032,8 @@ Return ONLY valid JSON with the fixed code for this snippet:
 async def review_repo_async(
     request: Request,
     file: UploadFile = File(...),
-    git_log: str = Form(None),
-    git_diff: str = Form(None),
+    git_log: str = Form(""),
+    git_diff: str = Form(""),
     force_review: str = Form(None),
     background_tasks: BackgroundTasks = None
 ):
