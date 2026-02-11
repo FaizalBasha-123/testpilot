@@ -368,12 +368,34 @@ async def handle_request(body: Dict[str, Any], event: str):
     # handle new PRs
     elif event == 'pull_request' and action != 'synchronize' and action != 'closed':
         get_logger().debug(f'Request body', artifact=body, event=event)
-        await handle_new_pr_opened(body, event, sender, sender_id, action, log_context, agent)
+        try:
+            await handle_new_pr_opened(body, event, sender, sender_id, action, log_context, agent)
+        except ValueError as e:
+            if "GitHub app ID and private key are required" in str(e):
+                get_logger().error(
+                    "PR webhook received but GitHub App credentials are missing in AI-core",
+                    hint="Set GITHUB__APP_ID and GITHUB__PRIVATE_KEY (or mapped GITHUB_APP_ID/GITHUB_APP_PRIVATE_KEY) and restart ai-core",
+                    event=event,
+                    action=action,
+                )
+                return {}
+            raise
     elif event == "issue_comment" and 'edited' in action:
         pass # handle_checkbox_clicked
     # handle pull_request event with synchronize action - "push trigger" for new commits
     elif event == 'pull_request' and action == 'synchronize':
-        await handle_push_trigger_for_new_commits(body, event, sender,sender_id,  action, log_context, agent)
+        try:
+            await handle_push_trigger_for_new_commits(body, event, sender,sender_id,  action, log_context, agent)
+        except ValueError as e:
+            if "GitHub app ID and private key are required" in str(e):
+                get_logger().error(
+                    "Push-trigger webhook received but GitHub App credentials are missing in AI-core",
+                    hint="Set GITHUB__APP_ID and GITHUB__PRIVATE_KEY (or mapped GITHUB_APP_ID/GITHUB_APP_PRIVATE_KEY) and restart ai-core",
+                    event=event,
+                    action=action,
+                )
+                return {}
+            raise
     elif event == 'pull_request' and action == 'closed':
         if get_settings().get("CONFIG.ANALYTICS_FOLDER", ""):
             handle_closed_pr(body, event, action, log_context)

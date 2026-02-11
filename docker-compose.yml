@@ -127,6 +127,14 @@ services:
       - "3000:3000"
     environment:
       - SONAR_SERVICE_URL=http://sonar-scanner:8000
+      # GitHub App credentials for PR webhook processing in AI-core.
+      # Keep GITHUB_APP_* for root env compatibility and map to Dynaconf keys used by PR-Agent.
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GITHUB__APP_ID=${GITHUB_APP_ID}
+      - GITHUB__PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
+      - GITHUB__WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - OPENROUTER__KEY=${OPENROUTER_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_EMBEDDING_API_KEY=${GROQ_EMBEDDING_API_KEY}
