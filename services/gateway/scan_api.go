@@ -252,7 +252,33 @@ func (app *App) handleJobStatus(w http.ResponseWriter, r *http.Request) {
 	jobsMut.RUnlock()
 
 	if !exists {
-		http.Error(w, "Job not found", http.StatusNotFound)
+		// Fallback: this might be an AI-core native job id (e.g. analyze_unified).
+		aiCoreURL := os.Getenv("AI_CORE_URL")
+		if strings.TrimSpace(app.cfg.AICoreURL) != "" {
+			aiCoreURL = app.cfg.AICoreURL
+		}
+		if aiCoreURL == "" {
+			aiCoreURL = "http://ai-core:3000"
+		}
+
+		targetURL := fmt.Sprintf("%s/api/v1/ide/job_status/%s", strings.TrimRight(aiCoreURL, "/"), jobID)
+		req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+		if err != nil {
+			http.Error(w, "Failed to create proxy request", http.StatusInternalServerError)
+			return
+		}
+
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, "Failed to reach AI Core", http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
 		return
 	}
 
@@ -273,10 +299,39 @@ func (app *App) handleCancelJob(w http.ResponseWriter, r *http.Request) {
 	if job, exists := jobs[jobID]; exists {
 		job.Status = "cancelled"
 		job.Logs = append(job.Logs, "Job cancelled by user")
+		jobsMut.Unlock()
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 	jobsMut.Unlock()
 
-	w.WriteHeader(http.StatusOK)
+	// Fallback: forward cancel request for AI-core native jobs.
+	aiCoreURL := os.Getenv("AI_CORE_URL")
+	if strings.TrimSpace(app.cfg.AICoreURL) != "" {
+		aiCoreURL = app.cfg.AICoreURL
+	}
+	if aiCoreURL == "" {
+		aiCoreURL = "http://ai-core:3000"
+	}
+
+	targetURL := fmt.Sprintf("%s/api/v1/ide/cancel/%s", strings.TrimRight(aiCoreURL, "/"), jobID)
+	req, err := http.NewRequest(http.MethodPost, targetURL, nil)
+	if err != nil {
+		http.Error(w, "Failed to create proxy request", http.StatusInternalServerError)
+		return
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Failed to reach AI Core", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
 }
 
 func (app *App) processScanJob(jobID string, zipPath string, gitLog string, gitDiff string, forceReview string) {
