@@ -50,7 +50,12 @@ async def handle_github_webhooks(background_tasks: BackgroundTasks, request: Req
     context["installation_id"] = installation_id
     context["settings"] = copy.deepcopy(global_settings)
     context["git_provider"] = {}
-    background_tasks.add_task(handle_request, body, event=request.headers.get("X-GitHub-Event", None))
+    background_tasks.add_task(
+        handle_request,
+        body,
+        event=request.headers.get("X-GitHub-Event", None),
+        delivery_id=request.headers.get("X-GitHub-Delivery", None),
+    )
     return {}
 
 
@@ -309,7 +314,7 @@ def should_process_pr_logic(body) -> bool:
     return True
 
 
-async def handle_request(body: Dict[str, Any], event: str):
+async def handle_request(body: Dict[str, Any], event: str, delivery_id: str = ""):
     """
     Handle incoming GitHub webhook requests.
 
@@ -318,9 +323,27 @@ async def handle_request(body: Dict[str, Any], event: str):
         event: The GitHub event type (e.g. "pull_request", "issue_comment", etc.).
     """
     action = body.get("action")  # "created", "opened", "reopened", "ready_for_review", "review_requested", "synchronize"
-    get_logger().debug(f"Handling request with event: {event}, action: {action}")
+    get_logger().debug(
+        "Handling request",
+        event=event,
+        action=action,
+        delivery_id=delivery_id,
+    )
     if not action:
-        get_logger().debug(f"No action found in request body, exiting handle_request")
+        if event == "push":
+            get_logger().info(
+                "Ignoring push webhook for PR agent flow",
+                event=event,
+                delivery_id=delivery_id,
+                hint="Enable pull_request and issue_comment webhook events for PR automation.",
+            )
+        else:
+            get_logger().warning(
+                "Webhook missing action; skipping",
+                event=event,
+                delivery_id=delivery_id,
+                body_keys=sorted(list(body.keys()))[:20],
+            )
         return {}
 
     # [BlackboxTester] Payment/Access Verification

@@ -29,7 +29,8 @@ interface CommitReviewData {
     issues?: CommitReviewIssue[];
     fixes?: CommitReviewFix[];
     logs?: string[];
-    stage?: 'setting_up' | 'analyzing' | 'reviewing' | 'completed';
+    stage?: 'setting_up' | 'analyzing' | 'reviewing' | 'completed' | 'cancelled';
+    jobId?: string;
 }
 
 // SVG Icons (inline, enterprise-grade)
@@ -76,6 +77,14 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         detail: 'Waiting for workspace context sync'
     };
     private _commitFixStates: Map<string, 'pending' | 'accepted' | 'rejected'> = new Map();
+    private _activeCommitReviewRunId: number = 0;
+    private _activeCommitReview: {
+        runId: number;
+        commitSha: string;
+        backendUrl: string;
+        jobId?: string;
+        cancelRequested: boolean;
+    } | null = null;
 
     constructor(
         extensionUri: vscode.Uri,
@@ -134,6 +143,9 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                     if (this._selectedCommit) {
                         this._analyzeCommit(this._selectedCommit, true);
                     }
+                    break;
+                case 'cancelCommitReview':
+                    await this._cancelActiveCommitReview('Cancelled by user');
                     break;
 
                 case 'goBack':
@@ -297,6 +309,12 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
     private async _analyzeCommit(commit: TrackedCommit, forceReview: boolean = false) {
         if (!this._view) return;
 
+        if (this._activeCommitReview && this._activeCommitReview.commitSha !== commit.sha) {
+            await this._cancelActiveCommitReview('Cancelled: a new review was started');
+        }
+
+        // Start each review run with isolated accept/reject state.
+        this._commitFixStates.clear();
         await this._commitTracker.updateCommitStatus(commit.sha, 'analyzing');
         this._updateView();
 
@@ -316,6 +334,13 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
 
             const config = vscode.workspace.getConfiguration('testpilot');
             const backendUrl = config.get<string>('backendUrl', 'https://testpilot-64v5.onrender.com');
+            const runId = ++this._activeCommitReviewRunId;
+            this._activeCommitReview = {
+                runId,
+                commitSha: commit.sha,
+                backendUrl,
+                cancelRequested: false
+            };
 
             // Commit review uses the same real backend pipeline as security analysis.
             // This intentionally avoids local mock heuristics and always requests AI-core analysis.
@@ -345,19 +370,37 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
             if (!jobId) {
                 throw new Error('Commit review response missing job_id');
             }
+            if (!this._activeCommitReview || this._activeCommitReview.runId !== runId) {
+                throw new Error('__COMMIT_REVIEW_CANCELLED__');
+            }
+            this._activeCommitReview.jobId = jobId;
+            if (this._activeCommitReview.cancelRequested) {
+                await this._requestBackendJobCancel(backendUrl, jobId);
+                throw new Error('__COMMIT_REVIEW_CANCELLED__');
+            }
 
             await this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', {
                 logs: ['Commit review submitted. Waiting for backend updates...'],
-                stage: 'setting_up'
+                stage: 'setting_up',
+                jobId
             });
 
             let reviewData: CommitReviewData | undefined;
             let lastLogLine = '';
             while (!reviewData) {
+                if (!this._activeCommitReview || this._activeCommitReview.runId !== runId || this._activeCommitReview.cancelRequested) {
+                    throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                }
                 await new Promise(resolve => setTimeout(resolve, 2000));
+                if (!this._activeCommitReview || this._activeCommitReview.runId !== runId || this._activeCommitReview.cancelRequested) {
+                    throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                }
                 const statusResponse = await fetch(`${backendUrl}/api/v1/ide/job_status/${jobId}`);
                 if (!statusResponse.ok) {
                     throw new Error(`Review status failed: ${statusResponse.status} ${statusResponse.statusText}`);
+                }
+                if (!this._activeCommitReview || this._activeCommitReview.runId !== runId || this._activeCommitReview.cancelRequested) {
+                    throw new Error('__COMMIT_REVIEW_CANCELLED__');
                 }
 
                 const statusData = await statusResponse.json();
@@ -387,6 +430,8 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                     await this._autoApplyCommitFixes(reviewData.fixes || []);
                 } else if (statusData.status === 'failed') {
                     throw new Error(statusData.error || statusData.result?.error || 'Commit review failed');
+                } else if (statusData.status === 'cancelled') {
+                    throw new Error('__COMMIT_REVIEW_CANCELLED__');
                 } else {
                     const logs = Array.isArray(statusData.logs)
                         ? statusData.logs
@@ -415,6 +460,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                     const prevData = (existing?.reviewData || {}) as CommitReviewData;
                     await this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', {
                         ...prevData,
+                        jobId,
                         logs: mergedLogs,
                         stage
                     });
@@ -424,15 +470,75 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
             await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', reviewData);
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : String(e);
+            if (errorMessage === '__COMMIT_REVIEW_CANCELLED__') {
+                return;
+            }
             await this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', {
                 summary: `Review failed: ${errorMessage}`,
                 score: 0,
                 issues: [{ severity: 'critical', description: errorMessage }],
                 fixes: []
             });
+        } finally {
+            if (this._activeCommitReview && this._activeCommitReview.commitSha === commit.sha) {
+                this._activeCommitReview = null;
+            }
         }
 
         this._selectedCommit = this._commitTracker.getCommit(commit.sha);
+        this._updateView();
+    }
+
+    private async _requestBackendJobCancel(backendUrl: string, jobId: string): Promise<void> {
+        try {
+            await fetch(`${backendUrl}/api/v1/ide/cancel/${jobId}`, { method: 'POST' });
+            this._commitOutputChannel.appendLine(`[Commit Review] Cancel requested for backend job ${jobId}`);
+        } catch (e) {
+            this._commitOutputChannel.appendLine(`[Commit Review] Failed to request backend cancel: ${String(e)}`);
+        }
+    }
+
+    private async _cancelActiveCommitReview(reason: string): Promise<void> {
+        const active = this._activeCommitReview;
+        let commitSha = active?.commitSha || this._selectedCommit?.sha || '';
+        let backendUrl = active?.backendUrl;
+        let jobId = active?.jobId;
+
+        // Fallback: recover job id from persisted commit state if in-memory run got lost.
+        if ((!jobId || !backendUrl) && this._selectedCommit?.status === 'analyzing') {
+            const persisted = this._getCommitReviewData(this._selectedCommit);
+            if (persisted.jobId) {
+                jobId = persisted.jobId;
+            }
+            const config = vscode.workspace.getConfiguration('testpilot');
+            backendUrl = config.get<string>('backendUrl', 'https://testpilot-64v5.onrender.com');
+            commitSha = this._selectedCommit.sha;
+        }
+
+        if (!commitSha) return;
+        if (active) {
+            active.cancelRequested = true;
+        }
+        if (jobId && backendUrl) {
+            await this._requestBackendJobCancel(backendUrl, jobId);
+        }
+
+        await this._commitTracker.updateCommitStatus(commitSha, 'reviewed', {
+            summary: reason,
+            score: 0,
+            issues: [],
+            fixes: [],
+            logs: [reason, jobId ? `Backend cancellation requested for job ${jobId}.` : 'No active backend job id found.'],
+            stage: 'cancelled',
+            jobId
+        });
+        this._commitOutputChannel.appendLine(`[Commit Review] ${reason}${jobId ? ` (job ${jobId})` : ''}`);
+        this._commitFixStates.clear();
+        this._activeCommitReview = null;
+
+        if (this._selectedCommit?.sha === commitSha) {
+            this._selectedCommit = this._commitTracker.getCommit(commitSha);
+        }
         this._updateView();
     }
 
@@ -812,6 +918,9 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
                 </div>
                 <div class="logs-container">
                     ${logsHtml}
+                </div>
+                <div style="padding-top: 10px;">
+                    <button class="secondary-btn danger-btn" onclick="cancelCommitReview()">${SVG.reject} Cancel Analysis</button>
                 </div>
             `;
         }
@@ -1216,6 +1325,25 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
             font-weight: 500;
         }
         .primary-btn:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+        .secondary-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            color: var(--vscode-foreground, #ccc);
+            border: 1px solid var(--vscode-panel-border, #444);
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .secondary-btn:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
+        .danger-btn {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+        .danger-btn:hover { background: rgba(220,53,69,0.12); }
 
         /* Security Running */
         .security-running {
@@ -1324,6 +1452,7 @@ export class TestPilotSidebarProvider implements vscode.WebviewViewProvider {
         function acceptSecurityFix(filename) { vscode.postMessage({ type: 'acceptSecurityFix', filename }); }
         function rejectSecurityFix(filename) { vscode.postMessage({ type: 'rejectSecurityFix', filename }); }
         function reviewCommit() { vscode.postMessage({ type: 'reviewCommit' }); }
+        function cancelCommitReview() { vscode.postMessage({ type: 'cancelCommitReview' }); }
     </script>
 </body>
 </html>`;

@@ -48,6 +48,8 @@ class TestPilotSidebarProvider {
             detail: 'Waiting for workspace context sync'
         };
         this._commitFixStates = new Map();
+        this._activeCommitReviewRunId = 0;
+        this._activeCommitReview = null;
         this._extensionUri = extensionUri;
         this._commitTracker = commitTracker;
         this._stagingManager = stagingManager;
@@ -93,6 +95,9 @@ class TestPilotSidebarProvider {
                     if (this._selectedCommit) {
                         this._analyzeCommit(this._selectedCommit, true);
                     }
+                    break;
+                case 'cancelCommitReview':
+                    yield this._cancelActiveCommitReview('Cancelled by user');
                     break;
                 case 'goBack':
                     if (this._selectedToggle === 'commits') {
@@ -239,6 +244,11 @@ class TestPilotSidebarProvider {
         return __awaiter(this, void 0, void 0, function* () {
             if (!this._view)
                 return;
+            if (this._activeCommitReview && this._activeCommitReview.commitSha !== commit.sha) {
+                yield this._cancelActiveCommitReview('Cancelled: a new review was started');
+            }
+            // Start each review run with isolated accept/reject state.
+            this._commitFixStates.clear();
             yield this._commitTracker.updateCommitStatus(commit.sha, 'analyzing');
             this._updateView();
             try {
@@ -254,6 +264,13 @@ class TestPilotSidebarProvider {
                 this._commitOutputChannel.appendLine(`[Commit Review] git_log chars=${safeLog.length} git_diff chars=${safeDiff.length}`);
                 const config = vscode.workspace.getConfiguration('testpilot');
                 const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+                const runId = ++this._activeCommitReviewRunId;
+                this._activeCommitReview = {
+                    runId,
+                    commitSha: commit.sha,
+                    backendUrl,
+                    cancelRequested: false
+                };
                 // Commit review uses the same real backend pipeline as security analysis.
                 // This intentionally avoids local mock heuristics and always requests AI-core analysis.
                 const zip = require('jszip');
@@ -278,17 +295,35 @@ class TestPilotSidebarProvider {
                 if (!jobId) {
                     throw new Error('Commit review response missing job_id');
                 }
+                if (!this._activeCommitReview || this._activeCommitReview.runId !== runId) {
+                    throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                }
+                this._activeCommitReview.jobId = jobId;
+                if (this._activeCommitReview.cancelRequested) {
+                    yield this._requestBackendJobCancel(backendUrl, jobId);
+                    throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                }
                 yield this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', {
                     logs: ['Commit review submitted. Waiting for backend updates...'],
-                    stage: 'setting_up'
+                    stage: 'setting_up',
+                    jobId
                 });
                 let reviewData;
                 let lastLogLine = '';
                 while (!reviewData) {
+                    if (!this._activeCommitReview || this._activeCommitReview.runId !== runId || this._activeCommitReview.cancelRequested) {
+                        throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                    }
                     yield new Promise(resolve => setTimeout(resolve, 2000));
+                    if (!this._activeCommitReview || this._activeCommitReview.runId !== runId || this._activeCommitReview.cancelRequested) {
+                        throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                    }
                     const statusResponse = yield fetch(`${backendUrl}/api/v1/ide/job_status/${jobId}`);
                     if (!statusResponse.ok) {
                         throw new Error(`Review status failed: ${statusResponse.status} ${statusResponse.statusText}`);
+                    }
+                    if (!this._activeCommitReview || this._activeCommitReview.runId !== runId || this._activeCommitReview.cancelRequested) {
+                        throw new Error('__COMMIT_REVIEW_CANCELLED__');
                     }
                     const statusData = yield statusResponse.json();
                     if (statusData.status === 'completed') {
@@ -317,6 +352,9 @@ class TestPilotSidebarProvider {
                     else if (statusData.status === 'failed') {
                         throw new Error(statusData.error || ((_c = statusData.result) === null || _c === void 0 ? void 0 : _c.error) || 'Commit review failed');
                     }
+                    else if (statusData.status === 'cancelled') {
+                        throw new Error('__COMMIT_REVIEW_CANCELLED__');
+                    }
                     else {
                         const logs = Array.isArray(statusData.logs)
                             ? statusData.logs
@@ -342,13 +380,16 @@ class TestPilotSidebarProvider {
                         }
                         const existing = this._commitTracker.getCommit(commit.sha);
                         const prevData = ((existing === null || existing === void 0 ? void 0 : existing.reviewData) || {});
-                        yield this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', Object.assign(Object.assign({}, prevData), { logs: mergedLogs, stage }));
+                        yield this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', Object.assign(Object.assign({}, prevData), { jobId, logs: mergedLogs, stage }));
                     }
                 }
                 yield this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', reviewData);
             }
             catch (e) {
                 const errorMessage = e instanceof Error ? e.message : String(e);
+                if (errorMessage === '__COMMIT_REVIEW_CANCELLED__') {
+                    return;
+                }
                 yield this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', {
                     summary: `Review failed: ${errorMessage}`,
                     score: 0,
@@ -356,7 +397,66 @@ class TestPilotSidebarProvider {
                     fixes: []
                 });
             }
+            finally {
+                if (this._activeCommitReview && this._activeCommitReview.commitSha === commit.sha) {
+                    this._activeCommitReview = null;
+                }
+            }
             this._selectedCommit = this._commitTracker.getCommit(commit.sha);
+            this._updateView();
+        });
+    }
+    _requestBackendJobCancel(backendUrl, jobId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield fetch(`${backendUrl}/api/v1/ide/cancel/${jobId}`, { method: 'POST' });
+                this._commitOutputChannel.appendLine(`[Commit Review] Cancel requested for backend job ${jobId}`);
+            }
+            catch (e) {
+                this._commitOutputChannel.appendLine(`[Commit Review] Failed to request backend cancel: ${String(e)}`);
+            }
+        });
+    }
+    _cancelActiveCommitReview(reason) {
+        var _a, _b, _c;
+        return __awaiter(this, void 0, void 0, function* () {
+            const active = this._activeCommitReview;
+            let commitSha = (active === null || active === void 0 ? void 0 : active.commitSha) || ((_a = this._selectedCommit) === null || _a === void 0 ? void 0 : _a.sha) || '';
+            let backendUrl = active === null || active === void 0 ? void 0 : active.backendUrl;
+            let jobId = active === null || active === void 0 ? void 0 : active.jobId;
+            // Fallback: recover job id from persisted commit state if in-memory run got lost.
+            if ((!jobId || !backendUrl) && ((_b = this._selectedCommit) === null || _b === void 0 ? void 0 : _b.status) === 'analyzing') {
+                const persisted = this._getCommitReviewData(this._selectedCommit);
+                if (persisted.jobId) {
+                    jobId = persisted.jobId;
+                }
+                const config = vscode.workspace.getConfiguration('testpilot');
+                backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+                commitSha = this._selectedCommit.sha;
+            }
+            if (!commitSha)
+                return;
+            if (active) {
+                active.cancelRequested = true;
+            }
+            if (jobId && backendUrl) {
+                yield this._requestBackendJobCancel(backendUrl, jobId);
+            }
+            yield this._commitTracker.updateCommitStatus(commitSha, 'reviewed', {
+                summary: reason,
+                score: 0,
+                issues: [],
+                fixes: [],
+                logs: [reason, jobId ? `Backend cancellation requested for job ${jobId}.` : 'No active backend job id found.'],
+                stage: 'cancelled',
+                jobId
+            });
+            this._commitOutputChannel.appendLine(`[Commit Review] ${reason}${jobId ? ` (job ${jobId})` : ''}`);
+            this._commitFixStates.clear();
+            this._activeCommitReview = null;
+            if (((_c = this._selectedCommit) === null || _c === void 0 ? void 0 : _c.sha) === commitSha) {
+                this._selectedCommit = this._commitTracker.getCommit(commitSha);
+            }
             this._updateView();
         });
     }
@@ -749,6 +849,9 @@ class TestPilotSidebarProvider {
                 <div class="logs-container">
                     ${logsHtml}
                 </div>
+                <div style="padding-top: 10px;">
+                    <button class="secondary-btn danger-btn" onclick="cancelCommitReview()">${SVG.reject} Cancel Analysis</button>
+                </div>
             `;
         }
         return `
@@ -1140,6 +1243,25 @@ class TestPilotSidebarProvider {
             font-weight: 500;
         }
         .primary-btn:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+        .secondary-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            color: var(--vscode-foreground, #ccc);
+            border: 1px solid var(--vscode-panel-border, #444);
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .secondary-btn:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
+        .danger-btn {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+        .danger-btn:hover { background: rgba(220,53,69,0.12); }
 
         /* Security Running */
         .security-running {
@@ -1248,6 +1370,7 @@ class TestPilotSidebarProvider {
         function acceptSecurityFix(filename) { vscode.postMessage({ type: 'acceptSecurityFix', filename }); }
         function rejectSecurityFix(filename) { vscode.postMessage({ type: 'rejectSecurityFix', filename }); }
         function reviewCommit() { vscode.postMessage({ type: 'reviewCommit' }); }
+        function cancelCommitReview() { vscode.postMessage({ type: 'cancelCommitReview' }); }
     </script>
 </body>
 </html>`;
