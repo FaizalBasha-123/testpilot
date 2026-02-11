@@ -70,6 +70,11 @@ func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	gitLog := r.FormValue("git_log")
+	gitDiff := r.FormValue("git_diff")
+	forceReview := r.FormValue("force_review")
+	log.Printf("[gateway-upload] git context received git_log_chars=%d git_diff_chars=%d force_review=%q", len(gitLog), len(gitDiff), forceReview)
+
 	// Create Job ID
 	jobID := uuid.New().String()
 
@@ -110,7 +115,125 @@ func (app *App) handleReviewRepoAsync(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[gateway-upload:%s] queued async processing", jobID)
 
 	// Start Async Processing
-	go app.processScanJob(jobID, tempPath)
+	go app.processScanJob(jobID, tempPath, gitLog, gitDiff, forceReview)
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+func (app *App) handleAnalyzeUnified(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[gateway-analyze-unified] incoming request method=%s path=%s remote=%s content_length=%d", r.Method, r.URL.Path, r.RemoteAddr, r.ContentLength)
+
+	err := r.ParseMultipartForm(50 << 20) // 50 MB max
+	if err != nil {
+		log.Printf("[gateway-analyze-unified] parse form failed: %v", err)
+		writeJSONError(w, http.StatusBadRequest, "Failed to parse form: "+err.Error())
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		log.Printf("[gateway-analyze-unified] missing file field: %v", err)
+		writeJSONError(w, http.StatusBadRequest, "Missing 'file' in form data")
+		return
+	}
+	defer file.Close()
+
+	gitDiff := r.FormValue("git_diff")
+
+	requestID := uuid.New().String()
+
+	// Save zip to temp file to avoid using file after handler returns
+	tempDir := os.TempDir()
+	tempPath := filepath.Join(tempDir, requestID+".zip")
+	outFile, err := os.Create(tempPath)
+	if err != nil {
+		log.Printf("[gateway-analyze-unified:%s] failed to create temp file %s: %v", requestID, tempPath, err)
+		writeJSONError(w, http.StatusInternalServerError, "Failed to create temp file")
+		return
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, file)
+	if err != nil {
+		log.Printf("[gateway-analyze-unified:%s] failed to persist uploaded file: %v", requestID, err)
+		writeJSONError(w, http.StatusInternalServerError, "Failed to save file")
+		return
+	}
+	log.Printf("[gateway-analyze-unified:%s] upload accepted filename=%s size=%d temp_path=%s", requestID, header.Filename, header.Size, tempPath)
+
+	// Forward to AI Core
+	aiCoreURL := os.Getenv("AI_CORE_URL")
+	if strings.TrimSpace(app.cfg.AICoreURL) != "" {
+		aiCoreURL = app.cfg.AICoreURL
+	}
+	if aiCoreURL == "" {
+		aiCoreURL = "http://ai-core:3000"
+	}
+	log.Printf("[gateway-analyze-unified:%s] forwarding to ai_core=%s", requestID, aiCoreURL)
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		if gitDiff != "" {
+			if err := writer.WriteField("git_diff", gitDiff); err != nil {
+				log.Printf("[gateway-analyze-unified:%s] failed to add git_diff field: %v", requestID, err)
+			}
+		}
+
+		part, err := writer.CreateFormFile("file", "repo.zip")
+		if err != nil {
+			log.Printf("[gateway-analyze-unified:%s] failed to create multipart form field: %v", requestID, err)
+			return
+		}
+
+		zipFile, err := os.Open(tempPath)
+		if err != nil {
+			log.Printf("[gateway-analyze-unified:%s] failed to open zip for forwarding: %v", requestID, err)
+			return
+		}
+		defer zipFile.Close()
+
+		if _, err := io.Copy(part, zipFile); err != nil {
+			log.Printf("[gateway-analyze-unified:%s] failed to stream zip to multipart writer: %v", requestID, err)
+		}
+	}()
+
+	targetURL := aiCoreURL + "/api/v1/ide/analyze_unified"
+	req, err := http.NewRequest("POST", targetURL, pr)
+	if err != nil {
+		log.Printf("[gateway-analyze-unified:%s] failed to build request to ai-core: %v", requestID, err)
+		writeJSONError(w, http.StatusInternalServerError, "Failed to create request")
+		return
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Request-ID", requestID)
+	log.Printf("[gateway-analyze-unified:%s] POST %s", requestID, targetURL)
+
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[gateway-analyze-unified:%s] ai-core unreachable: %v", requestID, err)
+		writeJSONError(w, http.StatusBadGateway, "AI Core unreachable: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	// Remove temp file after forwarding
+	_ = os.Remove(tempPath)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		log.Printf("[gateway-analyze-unified:%s] failed to proxy response: %v", requestID, err)
+	}
 }
 
 func (app *App) handleJobStatus(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +279,7 @@ func (app *App) handleCancelJob(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (app *App) processScanJob(jobID string, zipPath string) {
+func (app *App) processScanJob(jobID string, zipPath string, gitLog string, gitDiff string, forceReview string) {
 	defer os.Remove(zipPath) // Cleanup local temp zip
 
 	// Helper to update status
@@ -181,7 +304,7 @@ func (app *App) processScanJob(jobID string, zipPath string) {
 	if aiCoreURL == "" {
 		aiCoreURL = "http://ai-core:3000"
 	}
-	log.Printf("[gateway-job:%s] forwarding zip=%s to ai_core=%s", jobID, zipPath, aiCoreURL)
+	log.Printf("[gateway-job:%s] forwarding zip=%s to ai_core=%s git_log_chars=%d git_diff_chars=%d force_review=%q", jobID, zipPath, aiCoreURL, len(gitLog), len(gitDiff), forceReview)
 
 	// Stream uploaded ZIP to AI Core to avoid buffering large files in memory.
 
@@ -191,6 +314,22 @@ func (app *App) processScanJob(jobID string, zipPath string) {
 	go func() {
 		defer pw.Close()
 		defer writer.Close()
+
+		if gitLog != "" {
+			if err := writer.WriteField("git_log", gitLog); err != nil {
+				log.Printf("[gateway-job:%s] failed to add git_log field: %v", jobID, err)
+			}
+		}
+		if gitDiff != "" {
+			if err := writer.WriteField("git_diff", gitDiff); err != nil {
+				log.Printf("[gateway-job:%s] failed to add git_diff field: %v", jobID, err)
+			}
+		}
+		if forceReview != "" {
+			if err := writer.WriteField("force_review", forceReview); err != nil {
+				log.Printf("[gateway-job:%s] failed to add force_review field: %v", jobID, err)
+			}
+		}
 
 		// Add file
 		part, err := writer.CreateFormFile("file", "repo.zip")

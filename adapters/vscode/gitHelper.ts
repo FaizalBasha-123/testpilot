@@ -476,6 +476,29 @@ export class GitHelper {
     }
 
     /**
+     * Get a concise commit log entry for a specific commit.
+     */
+    async getCommitLog(workspacePath: string, sha: string): Promise<string> {
+        try {
+            const cp = require('child_process');
+            return new Promise((resolve) => {
+                const command = `git show -s --format="%H%n%an%n%ad%n%s%n%b" ${sha}`;
+                cp.exec(command, { cwd: workspacePath, maxBuffer: 1024 * 1024 }, (err: any, stdout: string) => {
+                    if (err) {
+                        console.error('[GitHelper] getCommitLog failed:', err);
+                        resolve('');
+                        return;
+                    }
+                    resolve(stdout || '');
+                });
+            });
+        } catch (e) {
+            console.error('[GitHelper] getCommitLog error:', e);
+            return '';
+        }
+    }
+
+    /**
      * Get the remote origin URL in owner/repo format
      */
     async getRemoteOrigin(workspacePath: string): Promise<string> {
@@ -520,6 +543,27 @@ export class GitHelper {
             });
         } catch (e) {
             return [];
+        }
+    }
+
+    /**
+     * Get file content at a specific commit. Returns null if unavailable.
+     */
+    async getCommitFileContent(workspacePath: string, sha: string, filePath: string): Promise<string | null> {
+        try {
+            const cp = require('child_process');
+            return new Promise((resolve) => {
+                const safePath = filePath.replace(/"/g, '');
+                cp.exec(`git show ${sha}:"${safePath}"`, { cwd: workspacePath, maxBuffer: 1024 * 1024 * 5 }, (err: any, stdout: string) => {
+                    if (err) {
+                        resolve(null);
+                        return;
+                    }
+                    resolve(stdout || '');
+                });
+            });
+        } catch (e) {
+            return null;
         }
     }
 }

@@ -1015,34 +1015,60 @@ async def analyze_unified(
     Returns:
         job_id: Use to poll /job_status/{job_id}
     """
+    job_id = None
+    temp_dir = None
+    
     try:
         job_id = str(uuid.uuid4())
+        get_logger().info(f"[ide-analyze-unified] Starting job {job_id}")
+        
         temp_dir = os.path.join("/tmp", f"blackbox_unified_{os.urandom(4).hex()}")
         os.makedirs(temp_dir, exist_ok=True)
 
         zip_path = os.path.join(temp_dir, "repo.zip")
         with open(zip_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-    except Exception as exc:
-        get_logger().error(f"[ide-analyze-unified] Failed to persist upload: {exc}")
-        raise HTTPException(status_code=500, detail="Failed to persist uploaded archive")
+        
+        get_logger().info(f"[ide-analyze-unified] Saved upload to {zip_path}")
     
+    except Exception as exc:
+        get_logger().error(f"[ide-analyze-unified] Failed to persist upload: {exc}", exc_info=True)
+        # Clean up on failure
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except:
+                pass
+        return {
+            "error": "Failed to process upload",
+            "detail": str(exc),
+            "job_id": job_id or f"error-{uuid.uuid4()}",
+            "status": "failed"
+        }
+    
+    # Initialize job tracking
     JOBS[job_id] = {
         "status": "pending",
-        "logs": [],
+        "logs": ["Job initialized"],
         "progress": {"current_file": "", "processed": 0, "total": 0, "percentage": 0},
         "result": None,
         "analysis_type": "unified"
     }
     
-    if background_tasks is None:
-        get_logger().warning("[ide-analyze-unified] background_tasks missing; using asyncio task")
-        asyncio.create_task(process_unified_analysis(job_id, zip_path, temp_dir, git_diff))
-    else:
-        background_tasks.add_task(
-            process_unified_analysis,
-            job_id, zip_path, temp_dir, git_diff
-        )
+    # Start background processing
+    try:
+        if background_tasks is None:
+            get_logger().warning("[ide-analyze-unified] background_tasks missing; using asyncio task")
+            asyncio.create_task(process_unified_analysis(job_id, zip_path, temp_dir, git_diff))
+        else:
+            background_tasks.add_task(
+                process_unified_analysis,
+                job_id, zip_path, temp_dir, git_diff
+            )
+    except Exception as exc:
+        get_logger().error(f"[ide-analyze-unified] Failed to start background task: {exc}", exc_info=True)
+        JOBS[job_id]["status"] = "failed"
+        JOBS[job_id]["result"] = {"error": str(exc)}
     
     return {"job_id": job_id, "status": "pending", "analysis_type": "unified"}
 
@@ -1102,13 +1128,29 @@ async def process_unified_analysis(
         # Run unified analysis using orchestrator
         update_job_log(job_id, "Running parallel analysis (AI review + Sonar scan)...")
         
-        orchestrator = AnalysisOrchestrator()
-        result = await orchestrator.analyze(
-            workspace_path=workspace_path,
-            diff_content=git_diff or "",
-            changed_files=changed_files[:50],  # Limit files
-            job_id=job_id
-        )
+        try:
+            orchestrator = AnalysisOrchestrator()
+            result = await orchestrator.analyze(
+                workspace_path=workspace_path,
+                diff_content=git_diff or "",
+                changed_files=changed_files[:50],  # Limit files
+                job_id=job_id
+            )
+        except Exception as orch_err:
+            get_logger().error(f"Orchestrator failed: {orch_err}", exc_info=True)
+            # Create minimal result to avoid complete failure
+            from pr_agent.algo.findings import AnalysisResult
+            result = AnalysisResult(
+                findings=[],
+                summary={
+                    "total": 0,
+                    "by_source": {},
+                    "by_severity": {},
+                    "quality_gate": "ERROR",
+                    "error": str(orch_err)
+                },
+                execution_time_ms=0
+            )
         
         # Update progress
         JOBS[job_id]["progress"]["processed"] = len(changed_files)

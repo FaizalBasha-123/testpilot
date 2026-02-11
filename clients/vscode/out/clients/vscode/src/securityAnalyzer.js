@@ -15,6 +15,7 @@ const fs = require("fs");
 const path = require("path");
 // @ts-ignore
 const JSZip = require("jszip");
+const gitHelper_1 = require("../../../adapters/vscode/gitHelper");
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 /**
@@ -45,9 +46,12 @@ class SecurityAnalyzer {
                 // Get backend URL
                 const config = vscode.workspace.getConfiguration('testpilot');
                 const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+                const gitContext = yield this._collectGitContext(workspacePath);
                 // Upload for analysis
                 const form = new FormData();
                 form.append('file', content, 'repo.zip');
+                form.append('git_log', gitContext.gitLog);
+                form.append('git_diff', gitContext.gitDiff);
                 const response = yield fetch(`${backendUrl}/api/v1/ide/review_repo_async`, {
                     method: 'POST',
                     body: form,
@@ -154,10 +158,12 @@ class SecurityAnalyzer {
                 const zip = new JSZip();
                 yield this._addFolderToZip(zip, workspacePath, workspacePath);
                 const content = yield zip.generateAsync({ type: 'nodebuffer' });
+                const gitContext = yield this._collectGitContext(workspacePath);
                 const config = vscode.workspace.getConfiguration('testpilot');
                 const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
                 const form = new FormData();
                 form.append('file', content, 'repo.zip');
+                form.append('git_diff', gitContext.gitDiff);
                 const submitResponse = yield fetch(`${backendUrl}/api/v1/ide/analyze_unified`, {
                     method: 'POST',
                     body: form,
@@ -247,6 +253,25 @@ class SecurityAnalyzer {
         if (s.includes('low'))
             return 'low';
         return 'info';
+    }
+    _collectGitContext(workspacePath) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Use the same Git helper strategy used by commit list/review paths.
+            const validation = yield gitHelper_1.gitHelper.getValidationContext(workspacePath);
+            const history = yield gitHelper_1.gitHelper.getLog(workspacePath, 50);
+            let gitDiff = (validation.diff || '').trim();
+            if (!gitDiff) {
+                const recent = yield gitHelper_1.gitHelper.getRecentCommits(workspacePath, 1);
+                if (recent.length > 0) {
+                    gitDiff = yield gitHelper_1.gitHelper.getCommitDiff(workspacePath, recent[0].sha);
+                }
+            }
+            let gitLog = (history || '').trim();
+            if (!gitLog && validation.commits.length > 0) {
+                gitLog = `Range: ${validation.range}\n` + validation.commits.join('\n');
+            }
+            return { gitLog: gitLog || '', gitDiff: gitDiff || '' };
+        });
     }
     _addFolderToZip(zip, folderPath, rootPath) {
         return __awaiter(this, void 0, void 0, function* () {

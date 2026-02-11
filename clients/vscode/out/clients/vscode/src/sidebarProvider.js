@@ -52,6 +52,8 @@ class TestPilotSidebarProvider {
         this._commitTracker = commitTracker;
         this._stagingManager = stagingManager;
         this._securityAnalyzer = new securityAnalyzer_1.SecurityAnalyzer(stagingManager);
+        this._securityOutputChannel = vscode.window.createOutputChannel('TestPilot Security');
+        this._commitOutputChannel = vscode.window.createOutputChannel('TestPilot Commit Review');
         this._commitTracker.onCommitsChanged(() => {
             this._updateView();
         });
@@ -80,7 +82,16 @@ class TestPilotSidebarProvider {
                     if (commit) {
                         this._selectedCommit = commit;
                         this._currentView = 'commitDetail';
-                        this._analyzeCommit(commit);
+                        this._updateView();
+                        if (commit.status === 'pending') {
+                            this._commitOutputChannel.appendLine(`[Commit Review] Selected commit ${commit.shortSha}. Starting review...`);
+                            this._analyzeCommit(commit, true);
+                        }
+                    }
+                    break;
+                case 'reviewCommit':
+                    if (this._selectedCommit) {
+                        this._analyzeCommit(this._selectedCommit, true);
                     }
                     break;
                 case 'goBack':
@@ -102,24 +113,36 @@ class TestPilotSidebarProvider {
                     }
                     this._updateView();
                     break;
+                case 'expandCommitFix':
+                    const commitFixKey = `commit-fix-${message.filename}`;
+                    if (this._collapsedSections.has(commitFixKey)) {
+                        this._collapsedSections.delete(commitFixKey);
+                    }
+                    else {
+                        this._collapsedSections.add(commitFixKey);
+                    }
+                    yield this._showCommitFixDiff(message.filename);
+                    this._updateView();
+                    break;
                 case 'startSecurityAnalysis':
                     this._currentView = 'securityRunning';
                     this._updateView();
-                    this._securityAnalyzer.startAnalysis((result) => {
+                    this._securityAnalyzer.startAnalysis((result) => __awaiter(this, void 0, void 0, function* () {
                         this._analysisResult = result;
+                        if (result.status === 'completed') {
+                            yield this._autoApplySecurityFixes(result.fixes || []);
+                        }
                         if (result.status === 'completed' || result.status === 'failed') {
                             this._currentView = 'securityResults';
                         }
                         this._updateView();
-                    });
+                    }));
                     break;
                 case 'acceptFix':
+                    // This case is now handled by acceptSecurityFix for consistency
                     const fixToAccept = (_b = this._analysisResult) === null || _b === void 0 ? void 0 : _b.fixes.find(f => f.filename === message.filename);
                     if (fixToAccept) {
-                        yield this._securityAnalyzer.acceptFix(fixToAccept);
-                        this._analysisResult = Object.assign(Object.assign({}, this._analysisResult), { fixes: this._analysisResult.fixes.filter(f => f.filename !== message.filename) });
-                        vscode.window.showInformationMessage(`Applied fix to ${message.filename}`);
-                        this._updateView();
+                        yield this._acceptSecurityFix(message.filename);
                     }
                     break;
                 case 'rejectFix':
@@ -130,6 +153,23 @@ class TestPilotSidebarProvider {
                         vscode.window.showInformationMessage(`Rejected fix for ${message.filename}`);
                         this._updateView();
                     }
+                    break;
+                case 'expandSecurityFix':
+                    const fixKey = `fix-${message.filename}`;
+                    if (this._collapsedSections.has(fixKey)) {
+                        this._collapsedSections.delete(fixKey);
+                    }
+                    else {
+                        this._collapsedSections.add(fixKey);
+                    }
+                    yield this._showSecurityFixDiff(message.filename);
+                    this._updateView();
+                    break;
+                case 'acceptSecurityFix':
+                    yield this._acceptSecurityFix(message.filename);
+                    break;
+                case 'rejectSecurityFix':
+                    yield this._rejectSecurityFix(message.filename);
                     break;
                 case 'acceptCommitFix':
                     yield this._acceptCommitFix(message.filename);
@@ -168,6 +208,12 @@ class TestPilotSidebarProvider {
     _updateView() {
         if (!this._view)
             return;
+        if (this._selectedCommit) {
+            const refreshed = this._commitTracker.getCommit(this._selectedCommit.sha);
+            if (refreshed) {
+                this._selectedCommit = refreshed;
+            }
+        }
         let content = '';
         switch (this._currentView) {
             case 'commitList':
@@ -188,8 +234,8 @@ class TestPilotSidebarProvider {
         }
         this._view.webview.html = this._wrapHtml(content);
     }
-    _analyzeCommit(commit) {
-        var _a, _b, _c;
+    _analyzeCommit(commit, forceReview = false) {
+        var _a, _b, _c, _d;
         return __awaiter(this, void 0, void 0, function* () {
             if (!this._view)
                 return;
@@ -200,19 +246,25 @@ class TestPilotSidebarProvider {
                 if (!workspacePath)
                     return;
                 const diff = yield gitHelper_1.gitHelper.getCommitDiff(workspacePath, commit.sha);
-                const gitLog = yield gitHelper_1.gitHelper.getLog(workspacePath, 50);
+                const gitLog = yield gitHelper_1.gitHelper.getCommitLog(workspacePath, commit.sha);
+                const safeLog = gitLog && gitLog.trim().length > 0
+                    ? gitLog
+                    : `${commit.sha}\n${commit.message}`;
+                const safeDiff = diff && diff.trim().length > 0 ? diff : '';
+                this._commitOutputChannel.appendLine(`[Commit Review] git_log chars=${safeLog.length} git_diff chars=${safeDiff.length}`);
                 const config = vscode.workspace.getConfiguration('testpilot');
                 const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
                 // Commit review uses the same real backend pipeline as security analysis.
                 // This intentionally avoids local mock heuristics and always requests AI-core analysis.
                 const zip = require('jszip');
                 const archive = new zip();
-                yield this._addFolderToZip(archive, workspacePath, workspacePath);
+                yield this._addCommitFilesToZip(archive, workspacePath, commit.sha);
                 const content = yield archive.generateAsync({ type: 'nodebuffer' });
                 const form = new (require('form-data'))();
                 form.append('file', content, 'repo.zip');
-                form.append('git_log', gitLog || '');
-                form.append('git_diff', diff || '');
+                form.append('git_log', safeLog);
+                form.append('git_diff', safeDiff);
+                form.append('force_review', forceReview ? 'true' : 'false');
                 const response = yield fetch(`${backendUrl}/api/v1/ide/review_repo_async`, {
                     method: 'POST',
                     body: form,
@@ -226,7 +278,12 @@ class TestPilotSidebarProvider {
                 if (!jobId) {
                     throw new Error('Commit review response missing job_id');
                 }
+                yield this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', {
+                    logs: ['Commit review submitted. Waiting for backend updates...'],
+                    stage: 'setting_up'
+                });
                 let reviewData;
+                let lastLogLine = '';
                 while (!reviewData) {
                     yield new Promise(resolve => setTimeout(resolve, 2000));
                     const statusResponse = yield fetch(`${backendUrl}/api/v1/ide/job_status/${jobId}`);
@@ -247,11 +304,45 @@ class TestPilotSidebarProvider {
                             summary: result.review || 'Review completed',
                             score: issues.length === 0 ? 100 : Math.max(30, 100 - (issues.length * 10)),
                             issues,
-                            fixes
+                            fixes,
+                            logs: Array.isArray(statusData.logs)
+                                ? statusData.logs
+                                : Array.isArray(result.logs)
+                                    ? result.logs
+                                    : [],
+                            stage: 'completed'
                         };
+                        yield this._autoApplyCommitFixes(reviewData.fixes || []);
                     }
                     else if (statusData.status === 'failed') {
                         throw new Error(statusData.error || ((_c = statusData.result) === null || _c === void 0 ? void 0 : _c.error) || 'Commit review failed');
+                    }
+                    else {
+                        const logs = Array.isArray(statusData.logs)
+                            ? statusData.logs
+                            : Array.isArray((_d = statusData.result) === null || _d === void 0 ? void 0 : _d.logs)
+                                ? statusData.result.logs
+                                : [];
+                        const progress = statusData.progress || {};
+                        const fallbackLogs = [];
+                        if (progress.current_file) {
+                            const processed = typeof progress.processed === 'number' ? progress.processed : 0;
+                            const total = typeof progress.total === 'number' ? progress.total : 0;
+                            fallbackLogs.push(`Processing ${progress.current_file} (${processed}/${total})`);
+                        }
+                        if (!fallbackLogs.length && statusData.status) {
+                            fallbackLogs.push(`Status: ${statusData.status}`);
+                        }
+                        const mergedLogs = logs.length > 0 ? logs : fallbackLogs;
+                        const stage = this._deriveCommitStage(logs);
+                        const last = mergedLogs.length > 0 ? mergedLogs[mergedLogs.length - 1] : '';
+                        if (last && last !== lastLogLine) {
+                            this._commitOutputChannel.appendLine(`[Commit Review] ${last}`);
+                            lastLogLine = last;
+                        }
+                        const existing = this._commitTracker.getCommit(commit.sha);
+                        const prevData = ((existing === null || existing === void 0 ? void 0 : existing.reviewData) || {});
+                        yield this._commitTracker.updateCommitStatus(commit.sha, 'analyzing', Object.assign(Object.assign({}, prevData), { logs: mergedLogs, stage }));
                     }
                 }
                 yield this._commitTracker.updateCommitStatus(commit.sha, 'reviewed', reviewData);
@@ -300,15 +391,10 @@ class TestPilotSidebarProvider {
             const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
             if (!workspacePath)
                 return;
-            const newContent = fix.new_content || fix.newContent;
-            if (!newContent) {
-                vscode.window.showWarningMessage(`No generated code found for ${filename}`);
-                return;
-            }
             const filePath = path.join(workspacePath, filename);
-            yield this._stagingManager.stageFile(filePath, newContent, true);
-            yield this._stagingManager.acceptChange(filePath);
+            this._stagingManager.finalizeChange(filePath);
             this._commitFixStates.set(filename, 'accepted');
+            this._commitOutputChannel.appendLine(`[Commit Review] Accepted fix: ${filename}`);
             this._updateView();
         });
     }
@@ -323,7 +409,177 @@ class TestPilotSidebarProvider {
                 }
             }
             this._commitFixStates.set(filename, 'rejected');
+            this._commitOutputChannel.appendLine(`[Commit Review] Rejected fix: ${filename}`);
             this._updateView();
+        });
+    }
+    _showCommitFixDiff(filename) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._selectedCommit)
+                return;
+            const data = this._getCommitReviewData(this._selectedCommit);
+            const fix = (data.fixes || []).find(f => f.filename === filename);
+            if (!fix)
+                return;
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath)
+                return;
+            const newContent = fix.new_content || fix.newContent;
+            if (!newContent)
+                return;
+            const filePath = path.join(workspacePath, filename);
+            try {
+                yield this._stagingManager.stageFile(filePath, newContent, true);
+            }
+            catch (e) {
+                vscode.window.showErrorMessage(`Failed to preview fix: ${String(e)}`);
+            }
+        });
+    }
+    _showSecurityFixDiff(filename) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._analysisResult)
+                return;
+            const fix = this._analysisResult.fixes.find(f => f.filename === filename);
+            if (!fix)
+                return;
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath)
+                return;
+            const filePath = path.join(workspacePath, fix.filename);
+            try {
+                // Show diff using the staged original (kept until accept/reject).
+                yield this._stagingManager.stageFile(filePath, fix.newContent, true);
+            }
+            catch (e) {
+                vscode.window.showErrorMessage(`Failed to preview fix: ${String(e)}`);
+            }
+        });
+    }
+    _acceptSecurityFix(filename) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._analysisResult)
+                return;
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath)
+                return;
+            try {
+                const filePath = path.join(workspacePath, filename);
+                this._stagingManager.finalizeChange(filePath);
+                // Remove from the fixes list
+                this._analysisResult.fixes = this._analysisResult.fixes.filter(f => f.filename !== filename);
+                vscode.window.showInformationMessage(`✅ Accepted fix for ${filename}`);
+                this._securityOutputChannel.appendLine(`[Security] Accepted fix: ${filename}`);
+                this._analysisResult = undefined;
+                this._currentView = 'securityWelcome';
+            }
+            catch (e) {
+                vscode.window.showErrorMessage(`Failed to apply fix: ${String(e)}`);
+            }
+            this._updateView();
+        });
+    }
+    _rejectSecurityFix(filename) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this._analysisResult)
+                return;
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath)
+                return;
+            const filePath = path.join(workspacePath, filename);
+            try {
+                if (this._stagingManager.isStaged(filePath)) {
+                    yield this._stagingManager.rejectChange(filePath);
+                }
+                // Remove from the fixes list
+                this._analysisResult.fixes = this._analysisResult.fixes.filter(f => f.filename !== filename);
+                vscode.window.showInformationMessage(`❌ Rejected fix for ${filename}`);
+                this._securityOutputChannel.appendLine(`[Security] Rejected fix: ${filename}`);
+                this._analysisResult = undefined;
+                this._currentView = 'securityWelcome';
+            }
+            catch (e) {
+                vscode.window.showErrorMessage(`Failed to reject fix: ${String(e)}`);
+            }
+            this._updateView();
+        });
+    }
+    _autoApplySecurityFixes(fixes) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (fixes.length === 0)
+                return;
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath)
+                return;
+            this._securityOutputChannel.appendLine(`[Security] Auto-applying ${fixes.length} fix(es) to workspace.`);
+            for (const fix of fixes) {
+                const filePath = path.join(workspacePath, fix.filename);
+                try {
+                    yield this._stagingManager.stageFile(filePath, fix.newContent, false);
+                    const doc = yield vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+                    yield doc.save();
+                    this._securityOutputChannel.appendLine(`[Security] Applied fix: ${fix.filename}`);
+                }
+                catch (e) {
+                    this._securityOutputChannel.appendLine(`[Security] Failed to apply ${fix.filename}: ${String(e)}`);
+                }
+            }
+        });
+    }
+    _autoApplyCommitFixes(fixes) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (fixes.length === 0)
+                return;
+            const workspacePath = (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath;
+            if (!workspacePath)
+                return;
+            this._commitOutputChannel.appendLine(`[Commit Review] Auto-applying ${fixes.length} fix(es) to workspace.`);
+            for (const fix of fixes) {
+                const filePath = path.join(workspacePath, fix.filename);
+                const newContent = fix.new_content || fix.newContent;
+                if (!newContent) {
+                    this._commitOutputChannel.appendLine(`[Commit Review] Missing content for ${fix.filename}`);
+                    continue;
+                }
+                try {
+                    yield this._stagingManager.stageFile(filePath, newContent, false);
+                    const doc = yield vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+                    yield doc.save();
+                    this._commitOutputChannel.appendLine(`[Commit Review] Applied fix: ${fix.filename}`);
+                }
+                catch (e) {
+                    this._commitOutputChannel.appendLine(`[Commit Review] Failed to apply ${fix.filename}: ${String(e)}`);
+                }
+            }
+        });
+    }
+    _deriveCommitStage(logs) {
+        if (!logs || logs.length === 0)
+            return 'analyzing';
+        const last = logs[logs.length - 1].toLowerCase();
+        if (last.includes('review'))
+            return 'reviewing';
+        if (last.includes('llm'))
+            return 'reviewing';
+        if (last.includes('sonar') || last.includes('scan') || last.includes('analy'))
+            return 'analyzing';
+        return 'analyzing';
+    }
+    _addCommitFilesToZip(zip, workspacePath, sha) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const files = yield gitHelper_1.gitHelper.getCommitFiles(workspacePath, sha);
+            for (const file of files) {
+                const content = yield gitHelper_1.gitHelper.getCommitFileContent(workspacePath, sha, file);
+                if (content === null)
+                    continue;
+                zip.file(file, content);
+            }
         });
     }
     _addFolderToZip(zip, folderPath, rootPath) {
@@ -402,10 +658,12 @@ class TestPilotSidebarProvider {
         const isAnalyzing = commit.status === 'analyzing';
         const isReviewed = commit.status === 'reviewed';
         const filesCollapsed = this._collapsedSections.has('files');
+        const commitData = this._getCommitReviewData(commit);
+        const stage = commitData.stage || 'setting_up';
         const steps = [
             { label: 'Setting up', done: true },
-            { label: 'Analyzing changes', done: isReviewed, active: isAnalyzing },
-            { label: 'Reviewing files', done: isReviewed, active: false }
+            { label: 'Analyzing changes', done: isReviewed, active: isAnalyzing && stage !== 'reviewing' },
+            { label: 'Reviewing files', done: isReviewed, active: isAnalyzing && stage === 'reviewing' }
         ];
         let stepsHtml = steps.map(step => {
             const icon = step.done ? SVG.check : step.active ? SVG.spinner : SVG.circle;
@@ -421,13 +679,16 @@ class TestPilotSidebarProvider {
         }
         let reviewsHtml = '';
         if (isReviewed && commit.reviewData) {
-            const data = this._getCommitReviewData(commit);
+            const data = commitData;
             const score = (_a = data.score) !== null && _a !== void 0 ? _a : 0;
             const scoreIcon = score >= 80 ? SVG.check : score >= 60 ? SVG.medium : SVG.critical;
             reviewsHtml = `
                 <div class="review-summary">
                     <div class="score">${scoreIcon} Score: ${score}/100</div>
                     <div class="summary-text">${data.summary || ''}</div>
+                    <div class="review-actions">
+                        <button class="primary-btn" onclick="reviewCommit()">${SVG.play} Review Commit</button>
+                    </div>
                 </div>
             `;
             if (data.issues && data.issues.length > 0) {
@@ -447,17 +708,48 @@ class TestPilotSidebarProvider {
                     </div>
                 `;
                 for (const fix of pendingFixes) {
+                    const isExpanded = this._collapsedSections.has(`commit-fix-${fix.filename}`) === false;
+                    const unifiedDiff = fix.unifiedDiff || fix.unified_diff || '';
+                    const diffHtml = this._formatDiffHtml(unifiedDiff);
                     reviewsHtml += `
-                        <div class="fix-row">
-                            <div class="fix-file">${SVG.file} ${fix.filename}</div>
+                        <div class="fix-card">
+                            <div class="fix-header" onclick="expandCommitFix('${fix.filename.replace(/'/g, "\\'")}')"
+                                 style="cursor: pointer; display: flex; align-items: center; padding: 10px 14px; user-select: none;">
+                                <span style="color: var(--vscode-descriptionForeground, #888); margin-right: 8px;">
+                                    ${isExpanded ? SVG.chevronDown : SVG.chevronRight}
+                                </span>
+                                <span>${SVG.file} ${fix.filename}</span>
+                            </div>
+                            ${isExpanded ? `
+                                <div class="fix-diff" style="background: var(--vscode-editor-background, #1e1e1e); border-top: 1px solid var(--vscode-panel-border, #2a2a2a); max-height: 300px; overflow: auto;">
+                                    ${diffHtml}
+                                </div>
+                            ` : ''}
                             <div class="fix-actions">
-                                <button class="action-btn accept" onclick="acceptCommitFix('${fix.filename}')">${SVG.accept} Accept</button>
-                                <button class="action-btn reject" onclick="rejectCommitFix('${fix.filename}')">${SVG.reject} Reject</button>
+                                <button class="action-btn accept" onclick="acceptCommitFix('${fix.filename.replace(/'/g, "\\'")}')"
+                                        style="flex: 1; margin: 10px 10px 10px 14px;">${SVG.accept} Accept</button>
+                                <button class="action-btn reject" onclick="rejectCommitFix('${fix.filename.replace(/'/g, "\\'")}')"
+                                        style="flex: 1; margin: 10px 14px 10px 0;">${SVG.reject} Reject</button>
                             </div>
                         </div>
                     `;
                 }
             }
+        }
+        let progressHtml = '';
+        if (isAnalyzing) {
+            const logs = (commitData.logs || []).slice(-6);
+            const logsHtml = logs.length > 0
+                ? logs.map(line => `<div class="log-line">${this._escapeHtml(line)}</div>`).join('')
+                : '<div class="log-line">Waiting for backend updates...</div>';
+            progressHtml = `
+                <div class="section-header" style="padding-left:0;padding-right:0;border:none;">
+                    <span>LIVE STATUS</span>
+                </div>
+                <div class="logs-container">
+                    ${logsHtml}
+                </div>
+            `;
         }
         return `
             <div class="detail-header">
@@ -467,6 +759,7 @@ class TestPilotSidebarProvider {
             <div class="steps-section">
                 ${stepsHtml}
             </div>
+            ${progressHtml}
             <div class="section-header collapsible" onclick="toggleSection('files')">
                 <span>${filesCollapsed ? SVG.chevronRight : SVG.chevronDown} FILES</span>
                 <span class="badge">${commit.files.length}</span>
@@ -542,12 +835,27 @@ class TestPilotSidebarProvider {
         if (fixes.length > 0) {
             fixesHtml = '<div class="fixes-section">';
             for (const fix of fixes) {
+                const isExpanded = this._collapsedSections.has(`fix-${fix.filename}`) === false; // Default expanded
+                const diffHtml = this._formatDiffHtml(fix.unifiedDiff);
                 fixesHtml += `
-                    <div class="fix-row">
-                        <div class="fix-file">${SVG.file} ${fix.filename}</div>
+                    <div class="fix-card">
+                        <div class="fix-header" onclick="expandSecurityFix('${fix.filename.replace(/'/g, "\\'")}')"
+                             style="cursor: pointer; display: flex; align-items: center; padding: 10px 14px; user-select: none;">
+                            <span style="color: var(--vscode-descriptionForeground, #888); margin-right: 8px;">
+                                ${isExpanded ? SVG.chevronDown : SVG.chevronRight}
+                            </span>
+                            <span>${SVG.file} ${fix.filename}</span>
+                        </div>
+                        ${isExpanded ? `
+                            <div class="fix-diff" style="background: var(--vscode-editor-background, #1e1e1e); border-top: 1px solid var(--vscode-panel-border, #2a2a2a); max-height: 300px; overflow: auto;">
+                                ${diffHtml}
+                            </div>
+                        ` : ''}
                         <div class="fix-actions">
-                            <button class="action-btn accept" onclick="acceptFix('${fix.filename}')">${SVG.accept} Accept</button>
-                            <button class="action-btn reject" onclick="rejectFix('${fix.filename}')">${SVG.reject} Reject</button>
+                            <button class="action-btn accept" onclick="acceptSecurityFix('${fix.filename.replace(/'/g, "\\'")}')"
+                                    style="flex: 1; margin: 10px 10px 10px 14px;">${SVG.accept} Accept</button>
+                            <button class="action-btn reject" onclick="rejectSecurityFix('${fix.filename.replace(/'/g, "\\'")}')"
+                                    style="flex: 1; margin: 10px 14px 10px 0;">${SVG.reject} Reject</button>
                         </div>
                     </div>
                 `;
@@ -571,6 +879,32 @@ class TestPilotSidebarProvider {
                 ${fixesHtml}
             ` : '<div class="empty-state">No automatic fixes available</div>'}
         `;
+    }
+    _formatDiffHtml(unifiedDiff) {
+        if (!unifiedDiff)
+            return '<div style="padding: 14px; color: var(--vscode-descriptionForeground, #888);">No diff available</div>';
+        const lines = unifiedDiff.split('\n');
+        let html = '<div style="font-family: monospace; font-size: 12px; line-height: 1.4;">';
+        for (const line of lines) {
+            if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+                // Header lines
+                html += `<div style="color: var(--vscode-gitDecoration-ignoredResourceForeground, #666); padding: 0 14px;">${this._escapeHtml(line)}</div>`;
+            }
+            else if (line.startsWith('+')) {
+                // Added lines - green
+                html += `<div style="background: rgba(76,175,80,0.15); color: #4caf50; padding: 0 14px;">${this._escapeHtml(line)}</div>`;
+            }
+            else if (line.startsWith('-')) {
+                // Removed lines - red
+                html += `<div style="background: rgba(220,53,69,0.15); color: #dc3545; padding: 0 14px;">${this._escapeHtml(line)}</div>`;
+            }
+            else {
+                // Context lines
+                html += `<div style="color: var(--vscode-foreground, #ccc); padding: 0 14px;">${this._escapeHtml(line)}</div>`;
+            }
+        }
+        html += '</div>';
+        return html;
     }
     _escapeHtml(text) {
         return text.replace(/[&<>"']/g, (m) => {
@@ -767,6 +1101,7 @@ class TestPilotSidebarProvider {
         .review-summary { margin-bottom: 12px; }
         .score { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600; margin-bottom: 6px; }
         .summary-text { color: var(--vscode-descriptionForeground, #888); }
+        .review-actions { margin-top: 10px; display: flex; justify-content: flex-start; }
         .issues-list { margin-top: 10px; }
         .issue-row { padding: 6px 0; display: flex; align-items: center; gap: 8px; }
 
@@ -908,6 +1243,11 @@ class TestPilotSidebarProvider {
         function rejectFix(filename) { vscode.postMessage({ type: 'rejectFix', filename }); }
         function acceptCommitFix(filename) { vscode.postMessage({ type: 'acceptCommitFix', filename }); }
         function rejectCommitFix(filename) { vscode.postMessage({ type: 'rejectCommitFix', filename }); }
+        function expandCommitFix(filename) { vscode.postMessage({ type: 'expandCommitFix', filename }); }
+        function expandSecurityFix(filename) { vscode.postMessage({ type: 'expandSecurityFix', filename }); }
+        function acceptSecurityFix(filename) { vscode.postMessage({ type: 'acceptSecurityFix', filename }); }
+        function rejectSecurityFix(filename) { vscode.postMessage({ type: 'rejectSecurityFix', filename }); }
+        function reviewCommit() { vscode.postMessage({ type: 'reviewCommit' }); }
     </script>
 </body>
 </html>`;

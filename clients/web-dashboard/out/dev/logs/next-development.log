@@ -1,10 +1,2 @@
-[00:00:02.275] Server  LOG     
-[00:00:02.276] Server  LOG       We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
-[00:00:02.277] Server  LOG       The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
-
-[00:00:02.278] Server  LOG       	- include was updated to add 'out/types/**/*.ts'
-[00:00:02.279] Server  LOG       	- include was updated to add 'out/dev/types/**/*.ts'
-[00:00:02.279] Server  LOG     
-[00:00:02.840] Server  LOG     ✓ Ready in 1821ms
-[00:00:05.873] Server  LOG     ○ Compiling / ...
-[00:00:08.647] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:01.905] Server  LOG     ✓ Ready in 1292ms
+[00:00:06.946] Server  LOG     ○ Compiling / ...

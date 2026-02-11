@@ -99,7 +99,7 @@ services:
     environment:
       - SONARQUBE_URL=http://sonarqube:9000
       - SONARQUBE_TOKEN=${SONARQUBE_TOKEN}
-      - SONARQUBE_PASSWORD=${SONARQUBE_PASSWORD}
+      - SONARQUBE_PASSWORD=${SONARQUBE_PASSWORD:-admin}
       - UPLOAD_LIMIT_MB=${UPLOAD_LIMIT_MB:-1024}
     volumes:
       - /tmp/sonar_uploads:/tmp/sonar_uploads
@@ -133,6 +133,7 @@ services:
       - EMBEDDING_API_BASE=${EMBEDDING_API_BASE}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL}
       - CONFIG__MODEL=groq/llama-3.3-70b-versatile
+      - GUNICORN_WORKERS=1
       - SONARQUBE__ENABLED=true
       - SONARQUBE__URL=http://sonarqube:9000
       - SONARQUBE__TOKEN=${SONARQUBE_TOKEN}

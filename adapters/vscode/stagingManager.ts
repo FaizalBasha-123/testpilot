@@ -108,6 +108,13 @@ export class StagingManager implements vscode.TextDocumentContentProvider {
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     }
 
+    /**
+     * Finalize: Keep current file contents but discard stored original.
+     */
+    public finalizeChange(filePath: string) {
+        this.privateStagedState.delete(filePath);
+    }
+
     public isStaged(filePath: string): boolean {
         return this.privateStagedState.has(filePath);
     }

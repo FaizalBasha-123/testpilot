@@ -87,6 +87,16 @@ async def scan_via_microservice(zip_path: str, job_id: str):
         get_logger().error(f"Microservice Call Failed: {e}")
         raise e
 
+def _extract_sonar_issues(result: dict) -> list:
+    """Normalize Sonar microservice responses across versions."""
+    if not isinstance(result, dict):
+        return []
+    for key in ("findings", "vulnerabilities", "issues"):
+        value = result.get(key)
+        if isinstance(value, list):
+            return value
+    return []
+
 def generate_unified_diff(original: str, fixed: str, filename: str) -> str:
     """Generates a unified diff string (Git format) for inline highlighting."""
     original_lines = original.splitlines(keepends=True)
@@ -117,6 +127,7 @@ def _trace_headers(request: Request) -> dict:
 async def review_repo_async(
     request: Request,
     file: UploadFile = File(...),
+    force_review: str = Form(None),
     background_tasks: BackgroundTasks = None
 ):
     """
@@ -153,8 +164,9 @@ async def review_repo_async(
     JOBS[job_id]["logs"].append(f"ZIP received ({len(content)} bytes)")
     
     # Start Background Task
+    force_flag = str(force_review).lower() in ["1", "true", "yes", "on"]
     if background_tasks:
-        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir)
+        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir, None, None, force_flag)
     else:
         get_logger().warning(f"[ide-review-async:v1] job={job_id} missing background_tasks; task will not start")
         
@@ -212,7 +224,7 @@ async def review_ide_file(
                 shutil.make_archive(zip_path.replace(".zip", ""), 'zip', temp_dir)
                 
                 result = await scan_via_microservice(zip_path, f"ide_{os.urandom(4).hex()}")
-                issues = result.get("findings", [])
+                issues = _extract_sonar_issues(result)
                 
                 if issues:
                     sonar_findings = "\n".join([f"- {i['message']} (Line {i.get('line', '?')})" for i in issues])
@@ -486,7 +498,6 @@ def _setup_workspace_sync(zip_path: str, temp_dir: str):
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(temp_dir)
         print(f"[Profiling] Unzip complete. Extracted {len(zip_ref.namelist())} entries.")
-    os.remove(zip_path)
     
     # Count files immediately
     print(f"[Profiling] Counting files in {temp_dir}...")
@@ -499,7 +510,7 @@ def _git_init_sync(temp_dir: str):
     # Git Init
     os.system(f"cd {temp_dir} && git init && git config user.email 'blackbox@localhost' && git config user.name 'Blackbox Tester' && git add . && git commit -m 'initial'")
 
-async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: str = None, git_diff: str = None):
+async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: str = None, git_diff: str = None, force_review: bool = False):
     JOBS[job_id]["status"] = "processing"
     JOBS[job_id]["progress"] = {"current_file": "Initializing...", "processed": 0, "total": 0, "percentage": 0}
     
@@ -524,7 +535,9 @@ async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: s
     if git_diff:
         update_job_log(job_id, f"Received Git Diff ({len(git_diff)} chars)")
     else:
-        update_job_log(job_id, "No Git Diff received (Review Skipped)")
+        update_job_log(job_id, "No Git Diff received; continuing security scan")
+    if force_review:
+        update_job_log(job_id, "Force review enabled (full scan)")
     
     try:
         if JOBS[job_id]["status"] == "cancelled": return
@@ -554,8 +567,8 @@ async def process_repo_job(job_id: str, zip_path: str, temp_dir: str, git_log: s
                 
                 update_job_log(job_id, "Sending to Sonar Service...")
                 result = await scan_via_microservice(zip_path, job_id)
-                
-                issues = result.get("findings", [])
+
+                issues = _extract_sonar_issues(result)
                 sonar_report_raw = issues
                 
                 if issues:
@@ -621,7 +634,7 @@ OUTPUT REQUIREMENTS:
         summary_lines = []
 
         # [Phoenix] Enable Analysis if we have Sonar Findings OR Git Diff (Logic changes)
-        if sonar_findings or git_diff:
+        if sonar_findings or git_diff or force_review:
             files_to_issues = {}
             if sonar_findings:
                 for issue in sonar_report_raw:
@@ -650,6 +663,22 @@ OUTPUT REQUIREMENTS:
             for file in changed_files_from_diff:
                 if file not in files_to_issues:
                     files_to_issues[file] = [] 
+
+            # Force review fallback: include top code files if nothing queued
+            if force_review and not files_to_issues:
+                update_job_log(job_id, "Force review: scanning top files")
+                candidates = []
+                for root, dirs, files in os.walk(temp_dir):
+                    dirs[:] = [d for d in dirs if d not in ['.git', 'node_modules', '__pycache__', 'venv', '.venv']]
+                    for f in files:
+                        if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.rs')):
+                            rel_path = os.path.relpath(os.path.join(root, f), temp_dir)
+                            candidates.append(rel_path)
+                    if len(candidates) >= 10:
+                        break
+                for candidate in candidates[:10]:
+                    if candidate not in files_to_issues:
+                        files_to_issues[candidate] = []
                     
             # [DEBUG] Log all identified files from Sonar + Diff
             update_job_log(job_id, f"[Debug] Final Queue: {list(files_to_issues.keys())}")
@@ -1029,6 +1058,7 @@ async def review_repo_async(
     file: UploadFile = File(...),
     git_log: str = Form(None),
     git_diff: str = Form(None),
+    force_review: str = Form(None),
     background_tasks: BackgroundTasks = None
 ):
     trace = _trace_headers(request)
@@ -1054,9 +1084,17 @@ async def review_repo_async(
         f"[ide-review-async:v2] job={job_id} persisted zip bytes={zip_size} path={zip_path}"
     )
         
-    JOBS[job_id] = {"status": "pending", "logs": [], "result": None}
+    JOBS[job_id] = {
+        "status": "pending",
+        "logs": ["Job Queued..."],
+        "progress": {"current_file": "Uploading...", "processed": 0, "total": 0},
+        "result": None
+    }
+    update_job_log(job_id, f"ZIP received ({zip_size} bytes)")
+    force_flag = str(force_review).lower() in ["1", "true", "yes", "on"]
     if background_tasks:
-        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir, git_log, git_diff)
+        background_tasks.add_task(process_repo_job, job_id, zip_path, temp_dir, git_log, git_diff, force_flag)
+        update_job_log(job_id, "Background task scheduled")
         get_logger().info(f"[ide-review-async:v2] job={job_id} background task scheduled")
     else:
         get_logger().warning(f"[ide-review-async:v2] job={job_id} missing background_tasks; task will not start")
@@ -1102,34 +1140,60 @@ async def analyze_unified(
     Returns:
         job_id: Use to poll /job_status/{job_id}
     """
+    job_id = None
+    temp_dir = None
+    
     try:
         job_id = str(uuid.uuid4())
+        get_logger().info(f"[ide-analyze-unified] Starting job {job_id}")
+        
         temp_dir = os.path.join("/tmp", f"blackbox_unified_{os.urandom(4).hex()}")
         os.makedirs(temp_dir, exist_ok=True)
 
         zip_path = os.path.join(temp_dir, "repo.zip")
         with open(zip_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-    except Exception as exc:
-        get_logger().error(f"[ide-analyze-unified] Failed to persist upload: {exc}")
-        raise HTTPException(status_code=500, detail="Failed to persist uploaded archive")
+        
+        get_logger().info(f"[ide-analyze-unified] Saved upload to {zip_path}")
     
+    except Exception as exc:
+        get_logger().error(f"[ide-analyze-unified] Failed to persist upload: {exc}", exc_info=True)
+        # Clean up on failure
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except:
+                pass
+        return {
+            "error": "Failed to process upload",
+            "detail": str(exc),
+            "job_id": job_id or f"error-{uuid.uuid4()}",
+            "status": "failed"
+        }
+    
+    # Initialize job tracking
     JOBS[job_id] = {
         "status": "pending",
-        "logs": [],
+        "logs": ["Job initialized"],
         "progress": {"current_file": "", "processed": 0, "total": 0, "percentage": 0},
         "result": None,
         "analysis_type": "unified"
     }
     
-    if background_tasks is None:
-        get_logger().warning("[ide-analyze-unified] background_tasks missing; using asyncio task")
-        asyncio.create_task(process_unified_analysis(job_id, zip_path, temp_dir, git_diff))
-    else:
-        background_tasks.add_task(
-            process_unified_analysis,
-            job_id, zip_path, temp_dir, git_diff
-        )
+    # Start background processing
+    try:
+        if background_tasks is None:
+            get_logger().warning("[ide-analyze-unified] background_tasks missing; using asyncio task")
+            asyncio.create_task(process_unified_analysis(job_id, zip_path, temp_dir, git_diff))
+        else:
+            background_tasks.add_task(
+                process_unified_analysis,
+                job_id, zip_path, temp_dir, git_diff
+            )
+    except Exception as exc:
+        get_logger().error(f"[ide-analyze-unified] Failed to start background task: {exc}", exc_info=True)
+        JOBS[job_id]["status"] = "failed"
+        JOBS[job_id]["result"] = {"error": str(exc)}
     
     return {"job_id": job_id, "status": "pending", "analysis_type": "unified"}
 
@@ -1189,13 +1253,29 @@ async def process_unified_analysis(
         # Run unified analysis using orchestrator
         update_job_log(job_id, "Running parallel analysis (AI review + Sonar scan)...")
         
-        orchestrator = AnalysisOrchestrator()
-        result = await orchestrator.analyze(
-            workspace_path=workspace_path,
-            diff_content=git_diff or "",
-            changed_files=changed_files[:50],  # Limit files
-            job_id=job_id
-        )
+        try:
+            orchestrator = AnalysisOrchestrator()
+            result = await orchestrator.analyze(
+                workspace_path=workspace_path,
+                diff_content=git_diff or "",
+                changed_files=changed_files[:50],  # Limit files
+                job_id=job_id
+            )
+        except Exception as orch_err:
+            get_logger().error(f"Orchestrator failed: {orch_err}", exc_info=True)
+            # Create minimal result to avoid complete failure
+            from pr_agent.algo.findings import AnalysisResult
+            result = AnalysisResult(
+                findings=[],
+                summary={
+                    "total": 0,
+                    "by_source": {},
+                    "by_severity": {},
+                    "quality_gate": "ERROR",
+                    "error": str(orch_err)
+                },
+                execution_time_ms=0
+            )
         
         # Update progress
         JOBS[job_id]["progress"]["processed"] = len(changed_files)

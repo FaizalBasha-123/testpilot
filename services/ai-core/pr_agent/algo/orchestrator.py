@@ -341,16 +341,24 @@ Respond with ONLY valid JSON, no markdown code blocks."""
         Returns:
             List of UnifiedFinding from Sonar
         """
+        zip_path = None
         try:
+            # Check if Sonar service is configured
+            if not SONAR_SERVICE_URL or SONAR_SERVICE_URL in ["http://sonar-service:8000", "http://localhost:8000"]:
+                self.logger.warning(f"Sonar service not properly configured (URL: {SONAR_SERVICE_URL}), skipping scan")
+                return []
+            
             # Create zip of workspace for Sonar
             import tempfile
             import zipfile
             import shutil
             
             zip_path = tempfile.mktemp(suffix='.zip')
+            self.logger.info(f"Creating workspace zip for Sonar at {zip_path}")
             
             # Create zip file
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                file_count = 0
                 for root, dirs, files in os.walk(workspace_path):
                     # Skip common non-code directories
                     dirs[:] = [d for d in dirs if d not in ['.git', 'node_modules', '__pycache__', '.venv', 'venv']]
@@ -360,37 +368,52 @@ Respond with ONLY valid JSON, no markdown code blocks."""
                         arcname = os.path.relpath(file_path, workspace_path)
                         try:
                             zf.write(file_path, arcname)
-                        except Exception:
-                            pass
+                            file_count += 1
+                        except Exception as e:
+                            self.logger.warning(f"Could not add {file_path} to zip: {e}")
+            
+            self.logger.info(f"Created zip with {file_count} files, size: {os.path.getsize(zip_path)} bytes")
             
             # Send to Sonar service
+            self.logger.info(f"Sending to Sonar service at {SONAR_SERVICE_URL}/analyze")
             async with aiohttp.ClientSession() as session:
                 with open(zip_path, 'rb') as f:
                     data = aiohttp.FormData()
                     data.add_field('file', f, filename='repo.zip', content_type='application/zip')
                     
-                    async with session.post(
-                        f"{SONAR_SERVICE_URL}/analyze",
-                        data=data,
-                        timeout=aiohttp.ClientTimeout(total=SONAR_TIMEOUT_SECONDS)
-                    ) as response:
-                        if response.status == 200:
-                            sonar_result = await response.json()
-                            return sonar_response_to_unified(sonar_result)
-                        else:
-                            self.logger.error(f"Sonar returned status {response.status}")
-                            return []
+                    try:
+                        async with session.post(
+                            f"{SONAR_SERVICE_URL}/analyze",
+                            data=data,
+                            timeout=aiohttp.ClientTimeout(total=SONAR_TIMEOUT_SECONDS)
+                        ) as response:
+                            if response.status == 200:
+                                sonar_result = await response.json()
+                                self.logger.info(f"Sonar scan complete: {sonar_result.get('total_count', 0)} issues")
+                                return sonar_response_to_unified(sonar_result)
+                            else:
+                                response_text = await response.text()
+                                self.logger.error(f"Sonar returned status {response.status}: {response_text[:500]}")
+                                return []
+                    except asyncio.TimeoutError:
+                        self.logger.error(f"Sonar scan timed out after {SONAR_TIMEOUT_SECONDS}s")
+                        return []
+                    except aiohttp.ClientConnectorError as e:
+                        self.logger.error(f"Cannot connect to Sonar service at {SONAR_SERVICE_URL}: {e}")
+                        return []
             
         except Exception as e:
-            self.logger.error(f"Sonar scan error: {e}")
+            self.logger.error(f"Sonar scan error: {e}", exc_info=True)
             return []
         finally:
             # Cleanup temp zip
-            try:
-                if 'zip_path' in locals():
-                    os.remove(zip_path)
-            except Exception:
-                pass
+            if zip_path:
+                try:
+                    if os.path.exists(zip_path):
+                        os.remove(zip_path)
+                        self.logger.debug(f"Cleaned up temp zip {zip_path}")
+                except Exception as e:
+                    self.logger.warning(f"Could not clean up {zip_path}: {e}")
     
     # ========================================================================
     # Fix Generation

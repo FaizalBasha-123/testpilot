@@ -67,6 +67,7 @@ func main() {
 
 	// Security Analysis endpoints
 	mux.HandleFunc("/api/v1/ide/review_repo_async", app.handleReviewRepoAsync)
+	mux.HandleFunc("/api/v1/ide/analyze_unified", app.handleAnalyzeUnified)
 	mux.HandleFunc("/api/v1/ide/job_status/", app.handleJobStatus)
 	mux.HandleFunc("/api/v1/ide/cancel/", app.handleCancelJob)
 

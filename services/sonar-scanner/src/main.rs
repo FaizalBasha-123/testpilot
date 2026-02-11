@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Read, path::PathBuf, process::Command, time::Duration};
+use std::{fs, path::PathBuf, process::Command, time::Duration};
 use tempfile::TempDir;
 use thiserror::Error;
 use tracing::{error, info, warn};
@@ -169,17 +169,39 @@ async fn analyze_handler(mut multipart: Multipart) -> Result<Json<AnalyzeRespons
     // Get SonarQube configuration from environment
     let sonarqube_url = std::env::var("SONARQUBE_URL")
         .unwrap_or_else(|_| "http://sonarqube:9000".to_string());
-    let sonarqube_token =
-        std::env::var("SONARQUBE_TOKEN").unwrap_or_else(|_| "admin".to_string());
+    let sonarqube_token = std::env::var("SONARQUBE_TOKEN").unwrap_or_default();
+    let sonarqube_password = std::env::var("SONARQUBE_PASSWORD").unwrap_or_else(|_| "admin".to_string());
+    let use_token = !sonarqube_token.trim().is_empty();
 
     // Run sonar-scanner
-    run_sonar_scanner(&project_dir, &job_id, &sonarqube_url, &sonarqube_token)?;
+    run_sonar_scanner(
+        &project_dir,
+        &job_id,
+        &sonarqube_url,
+        &sonarqube_token,
+        &sonarqube_password,
+        use_token,
+    )?;
 
     // Poll for task completion
-    poll_for_completion(&job_id, &sonarqube_url, &sonarqube_token).await?;
+    poll_for_completion(
+        &job_id,
+        &sonarqube_url,
+        &sonarqube_token,
+        &sonarqube_password,
+        use_token,
+    )
+    .await?;
 
     // Fetch vulnerabilities
-    let vulnerabilities = fetch_vulnerabilities(&job_id, &sonarqube_url, &sonarqube_token).await?;
+    let vulnerabilities = fetch_vulnerabilities(
+        &job_id,
+        &sonarqube_url,
+        &sonarqube_token,
+        &sonarqube_password,
+        use_token,
+    )
+    .await?;
 
     let total_count = vulnerabilities.len();
     info!("Analysis complete. Found {} vulnerabilities", total_count);
@@ -282,14 +304,26 @@ fn run_sonar_scanner(
     job_id: &str,
     sonarqube_url: &str,
     sonarqube_token: &str,
+    sonarqube_password: &str,
+    use_token: bool,
 ) -> Result<(), AppError> {
     info!("Running sonar-scanner for job: {}", job_id);
 
-    let output = Command::new("sonar-scanner")
+    let mut command = Command::new("sonar-scanner");
+    command
         .arg(format!("-Dsonar.projectKey={}", job_id))
         .arg(format!("-Dsonar.host.url={}", sonarqube_url))
-        .arg(format!("-Dsonar.login={}", sonarqube_token))
-        .arg("-Dsonar.sources=.")
+        .arg("-Dsonar.sources=.");
+
+    if use_token {
+        command.arg(format!("-Dsonar.login={}", sonarqube_token));
+    } else {
+        command
+            .arg("-Dsonar.login=admin")
+            .arg(format!("-Dsonar.password={}", sonarqube_password));
+    }
+
+    let output = command
         .current_dir(project_dir)
         .output()
         .map_err(|e| AppError::ScannerError(format!("Failed to execute sonar-scanner: {}", e)))?;
@@ -313,6 +347,8 @@ async fn poll_for_completion(
     job_id: &str,
     sonarqube_url: &str,
     sonarqube_token: &str,
+    sonarqube_password: &str,
+    use_token: bool,
 ) -> Result<(), AppError> {
     info!("Polling for task completion for job: {}", job_id);
 
@@ -324,10 +360,17 @@ async fn poll_for_completion(
     for attempt in 1..=max_attempts {
         tokio::time::sleep(poll_interval).await;
 
-        let response = client
+        let mut request = client
             .get(&poll_url)
-            .query(&[("component", job_id)])
-            .basic_auth("admin", Some(sonarqube_token))
+            .query(&[("component", job_id)]);
+
+        if use_token {
+            request = request.basic_auth(sonarqube_token, Some(""));
+        } else {
+            request = request.basic_auth("admin", Some(sonarqube_password));
+        }
+
+        let response = request
             .send()
             .await
             .map_err(|e| AppError::ApiError(format!("Failed to poll task status: {}", e)))?;
@@ -376,20 +419,27 @@ async fn fetch_vulnerabilities(
     job_id: &str,
     sonarqube_url: &str,
     sonarqube_token: &str,
+    sonarqube_password: &str,
+    use_token: bool,
 ) -> Result<Vec<SonarIssue>, AppError> {
     info!("Fetching vulnerabilities for job: {}", job_id);
 
     let client = reqwest::Client::new();
     let issues_url = format!("{}/api/issues/search", sonarqube_url);
 
-    let response = client
-        .get(&issues_url)
-        .query(&[
-            ("componentKeys", job_id),
-            ("types", "VULNERABILITY,SECURITY_HOTSPOT"),
-            ("ps", "500"), // Page size
-        ])
-        .basic_auth("admin", Some(sonarqube_token))
+    let mut request = client.get(&issues_url).query(&[
+        ("componentKeys", job_id),
+        ("types", "VULNERABILITY"),
+        ("ps", "500"), // Page size
+    ]);
+
+    if use_token {
+        request = request.basic_auth(sonarqube_token, Some(""));
+    } else {
+        request = request.basic_auth("admin", Some(sonarqube_password));
+    }
+
+    let response = request
         .send()
         .await
         .map_err(|e| AppError::ApiError(format!("Failed to fetch issues: {}", e)))?;

@@ -4,6 +4,7 @@ import * as path from 'path';
 // @ts-ignore
 import * as JSZip from 'jszip';
 import { StagingManager } from '../../../adapters/vscode/stagingManager';
+import { gitHelper } from '../../../adapters/vscode/gitHelper';
 
 const fetch: any = require('node-fetch');
 const FormData: any = require('form-data');
@@ -67,11 +68,14 @@ export class SecurityAnalyzer {
 
             // Get backend URL
             const config = vscode.workspace.getConfiguration('testpilot');
-            const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+            const backendUrl = config.get<string>('backendUrl', 'https://testpilot-64v5.onrender.com');
+            const gitContext = await this._collectGitContext(workspacePath);
 
             // Upload for analysis
             const form = new FormData();
             form.append('file', content, 'repo.zip');
+            form.append('git_log', gitContext.gitLog);
+            form.append('git_diff', gitContext.gitDiff);
 
             const response = await fetch(`${backendUrl}/api/v1/ide/review_repo_async`, {
                 method: 'POST',
@@ -190,12 +194,14 @@ export class SecurityAnalyzer {
             const zip = new JSZip();
             await this._addFolderToZip(zip, workspacePath, workspacePath);
             const content = await zip.generateAsync({ type: 'nodebuffer' });
+            const gitContext = await this._collectGitContext(workspacePath);
 
             const config = vscode.workspace.getConfiguration('testpilot');
-            const backendUrl = config.get('backendUrl', 'https://testpilot-64v5.onrender.com');
+            const backendUrl = config.get<string>('backendUrl', 'https://testpilot-64v5.onrender.com');
 
             const form = new FormData();
             form.append('file', content, 'repo.zip');
+            form.append('git_diff', gitContext.gitDiff);
 
             const submitResponse = await fetch(`${backendUrl}/api/v1/ide/analyze_unified`, {
                 method: 'POST',
@@ -279,6 +285,27 @@ export class SecurityAnalyzer {
         if (s.includes('medium') || s.includes('minor')) return 'medium';
         if (s.includes('low')) return 'low';
         return 'info';
+    }
+
+    private async _collectGitContext(workspacePath: string): Promise<{ gitLog: string; gitDiff: string }> {
+        // Use the same Git helper strategy used by commit list/review paths.
+        const validation = await gitHelper.getValidationContext(workspacePath);
+        const history = await gitHelper.getLog(workspacePath, 50);
+
+        let gitDiff = (validation.diff || '').trim();
+        if (!gitDiff) {
+            const recent = await gitHelper.getRecentCommits(workspacePath, 1);
+            if (recent.length > 0) {
+                gitDiff = await gitHelper.getCommitDiff(workspacePath, recent[0].sha);
+            }
+        }
+
+        let gitLog = (history || '').trim();
+        if (!gitLog && validation.commits.length > 0) {
+            gitLog = `Range: ${validation.range}\n` + validation.commits.join('\n');
+        }
+
+        return { gitLog: gitLog || '', gitDiff: gitDiff || '' };
     }
 
     private async _addFolderToZip(zip: any, folderPath: string, rootPath: string): Promise<void> {

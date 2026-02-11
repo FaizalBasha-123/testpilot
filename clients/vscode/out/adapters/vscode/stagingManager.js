@@ -97,6 +97,12 @@ class StagingManager {
             yield vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         });
     }
+    /**
+     * Finalize: Keep current file contents but discard stored original.
+     */
+    finalizeChange(filePath) {
+        this.privateStagedState.delete(filePath);
+    }
     isStaged(filePath) {
         return this.privateStagedState.has(filePath);
     }
