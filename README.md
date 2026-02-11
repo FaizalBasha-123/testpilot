@@ -33,3 +33,6 @@ This project uses GitHub Secret Scanning to prevent credential leaks.
 
 ## 📄 License
 MIT License
+
+## 🔬 PR Smoke Test
+This line was added to trigger a clean PR event for webhook/agent verification.
