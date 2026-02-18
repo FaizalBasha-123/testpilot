@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +29,8 @@ func (a *App) handleGitHubLogin(w http.ResponseWriter, r *http.Request) {
 		Name:     "oauth_state",
 		Value:    state,
 		HttpOnly: true,
+		Secure:   isHTTPSRequest(r),
+		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 		MaxAge:   300,
 	})
@@ -68,11 +71,34 @@ func (a *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to exchange authorization code: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
+	if strings.TrimSpace(token.AccessToken) == "" {
+		http.Error(w, "oauth exchange returned empty access token", http.StatusUnauthorized)
+		return
+	}
 
-	client := github.NewClient(a.oauthConfig().Client(context.Background(), token))
-	user, _, err := client.Users.Get(context.Background(), "")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+		AccessToken: token.AccessToken,
+		TokenType:   "bearer",
+	})
+	httpClient := oauth2.NewClient(ctx, tokenSource)
+	client := github.NewClient(httpClient)
+	client.UserAgent = "testpilot-gateway/1.0"
+	user, resp, err := client.Users.Get(ctx, "")
 	if err != nil {
-		http.Error(w, "user fetch failed", http.StatusInternalServerError)
+		status := 0
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		log.Printf("oauth callback user fetch failed status=%d err=%v", status, err)
+		http.Error(w, fmt.Sprintf("user fetch failed (github status=%d): %v", status, err), http.StatusBadGateway)
+		return
+	}
+	if user.GetID() == 0 || strings.TrimSpace(user.GetLogin()) == "" {
+		log.Printf("oauth callback user payload incomplete id=%d login=%q", user.GetID(), user.GetLogin())
+		http.Error(w, "user fetch failed: github user payload incomplete", http.StatusBadGateway)
 		return
 	}
 
@@ -88,8 +114,8 @@ func (a *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Redirect to the same domain (Render backend serves frontend)
-	redirect := fmt.Sprintf("%s/auth/workspace?token=%s", a.cfg.BackendURL, jwtToken)
+	// Always return to the active gateway host handling this callback.
+	redirect := fmt.Sprintf("%s/auth/workspace?token=%s", requestOrigin(r), url.QueryEscape(jwtToken))
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
@@ -110,6 +136,8 @@ func (a *App) handleGitHubInstallStart(w http.ResponseWriter, r *http.Request) {
 		Name:     "oauth_state",
 		Value:    state,
 		HttpOnly: true,
+		Secure:   isHTTPSRequest(r),
+		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 		MaxAge:   300,
 	})
@@ -161,4 +189,24 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func requestOrigin(r *http.Request) string {
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
+		host := strings.TrimSpace(r.Host)
+		if host != "" {
+			return forwarded + "://" + host
+		}
+	}
+	if r.TLS != nil {
+		return "https://" + r.Host
+	}
+	return "http://" + r.Host
+}
+
+func isHTTPSRequest(r *http.Request) bool {
+	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+		return true
+	}
+	return r.TLS != nil
 }

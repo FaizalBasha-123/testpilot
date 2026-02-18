@@ -63,6 +63,8 @@ func main() {
 	mux.HandleFunc("/webhooks/github", app.handleGitHubWebhook)
 	mux.HandleFunc("/api/orgs", app.authMiddleware(app.handleListOrgs))
 	mux.HandleFunc("/api/repos", app.authMiddleware(app.handleListRepos))
+	mux.HandleFunc("/api/me", app.authMiddleware(app.handleMe))
+	mux.HandleFunc("/api/status", app.handleStatus)
 	mux.HandleFunc("/api/review-commit", app.handleReviewCommit)
 
 	// Security Analysis endpoints

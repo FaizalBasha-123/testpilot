@@ -1,198 +1,315 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import {
+  Activity,
   Box,
-  Search,
   CheckCircle,
-  Bug,
-  GitPullRequest,
-  AlertTriangle,
+  CircleAlert,
+  Cpu,
+  ExternalLink,
+  Github,
   Rocket,
-  Book,
-  MessageCircle,
-  TrendingUp,
-  Activity
+  Server,
+  Terminal,
+  Shield,
+  Workflow,
+  Zap,
 } from 'lucide-react';
-
-interface Stats {
-  totalRepos: number;
-  activeReviews: number;
-  prsMerged: number;
-  issuesFound: number;
-}
+import {
+  BACKEND_URL,
+  GatewayStatus,
+  MeResponse,
+  Repo,
+  fetchWithToken,
+} from '../../lib/api';
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats>({
-    totalRepos: 0,
-    activeReviews: 0,
-    prsMerged: 0,
-    issuesFound: 0,
-  });
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [status, setStatus] = useState<GatewayStatus | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setTimeout(() => {
-      setStats({
-        totalRepos: 3,
-        activeReviews: 5,
-        prsMerged: 12,
-        issuesFound: 23,
-      });
-      setRecentActivity([
-        { type: 'review', repo: 'TestPilot-MVP', message: 'AI review completed on PR #42', time: '2 hours ago', status: 'success' },
-        { type: 'pr', repo: 'TestPilot-MVP', message: 'Auto-generated optimization PR created', time: '5 hours ago', status: 'pending' },
-        { type: 'issue', repo: 'frontend-app', message: 'Security vulnerability detected', time: '1 day ago', status: 'warning' },
-        { type: 'merge', repo: 'backend-api', message: 'PR #38 merged successfully', time: '2 days ago', status: 'success' },
-      ]);
+    const token = localStorage.getItem('tp_token');
+    if (!token) {
+      setError('You are not signed in. Please login with GitHub.');
       setLoading(false);
-    }, 800);
+      return;
+    }
+
+    Promise.all([
+      fetchWithToken<{ repos: Repo[] }>('/api/repos', token),
+      fetch(`${BACKEND_URL}/api/status`, { cache: 'no-store' }).then((r) =>
+        r.ok ? (r.json() as Promise<GatewayStatus>) : null
+      ),
+      fetchWithToken<MeResponse>('/api/me', token),
+    ])
+      .then(([repoResp, statusResp, meResp]) => {
+        setRepos(repoResp.repos || []);
+        setStatus(statusResp);
+        setMe(meResp);
+      })
+      .catch(() => {
+        setError('Failed to load dashboard data from gateway.');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
+  const serviceSummary = useMemo(() => {
+    const services = status?.services || [];
+    const configured = services.filter((s) => s.configured).length;
+    const reachable = services.filter((s) => s.reachable).length;
+    return { configured, reachable, total: services.length };
+  }, [status]);
+
+  const privateRepos = repos.filter((r) => r.private).length;
+  const publicRepos = repos.length - privateRepos;
+
   return (
-    <div className="flex min-h-screen bg-[#0d1117]">
+    <div className="flex min-h-screen bg-[#02040a]">
       <Sidebar />
 
-      <div className="flex-1 p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-gray-400">Welcome back! Here's what's happening with your repositories.</p>
+      <div className="flex-1 p-8 lg:p-12 overflow-y-auto">
+        <header className="mb-10 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Command Center</h1>
+            <p className="text-gray-400">Real-time telemetry and orchestration for your AI review fleet.</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white/5 border border-white/5 rounded-full px-4 py-2">
+            <div className={`h-2.5 w-2.5 rounded-full ${status?.gateway?.reachable ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-sm font-mono text-gray-300">{status?.gateway?.reachable ? 'GATEWAY ONLINE' : 'OFFLINE'}</span>
+          </div>
+        </header>
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300 text-sm flex items-center gap-2">
+            <CircleAlert size={16} />
+            {error}
+          </div>
+        )}
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <MetricCard
+            title="Active Identity"
+            value={loading ? '...' : me?.login || 'Unavailable'}
+            hint="GitHub OAuth"
+            icon={<Github size={20} className="text-blue-400" />}
+          />
+          <MetricCard
+            title="Repositories"
+            value={loading ? '...' : String(repos.length)}
+            hint={`${privateRepos} Pvt / ${publicRepos} Pub`}
+            icon={<Box size={20} className="text-indigo-400" />}
+          />
+          <MetricCard
+            title="Tunnel Health"
+            value={
+              loading
+                ? '...'
+                : `${serviceSummary.reachable}/${serviceSummary.configured || serviceSummary.total}`
+            }
+            hint="Services Reachable"
+            icon={<Zap size={20} className="text-yellow-400" />}
+          />
+          <MetricCard
+            title="Pipeline Mode"
+            value={status?.gateway.mock_mode ? 'MOCK' : 'HYBRID'}
+            hint="Gateway Routing"
+            icon={<Cpu size={20} className="text-orange-400" />}
+          />
+          <MetricCard
+            title="Git Runtime"
+            value={
+              loading
+                ? '...'
+                : status?.runtime?.git?.installed
+                  ? 'INSTALLED'
+                  : 'MISSING'
+            }
+            hint={status?.runtime?.git?.version || 'Gateway host runtime'}
+            icon={<Terminal size={20} className="text-emerald-400" />}
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-sm font-medium">Total Repositories</span>
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Box size={20} className="text-blue-400" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-2">{loading ? '...' : stats.totalRepos}</p>
-            <div className="flex items-center text-xs text-green-400">
-              <Activity size={12} className="mr-1" />
-              <span>Active monitoring</span>
-            </div>
-          </div>
-
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-sm font-medium">Active Reviews</span>
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Search size={20} className="text-purple-400" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-2">{loading ? '...' : stats.activeReviews}</p>
-            <div className="flex items-center text-xs text-blue-400">
-              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-1.5 animate-pulse"></span>
-              <span>In progress</span>
-            </div>
-          </div>
-
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-sm font-medium">PRs Merged (30d)</span>
-              <div className="p-2 bg-green-500/10 rounded-lg">
-                <CheckCircle size={20} className="text-green-400" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-2">{loading ? '...' : stats.prsMerged}</p>
-            <div className="flex items-center text-xs text-green-400">
-              <TrendingUp size={12} className="mr-1" />
-              <span>+20% from last month</span>
-            </div>
-          </div>
-
-          <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 hover:border-gray-700 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-sm font-medium">Issues Found</span>
-              <div className="p-2 bg-yellow-500/10 rounded-lg">
-                <Bug size={20} className="text-yellow-400" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-2">{loading ? '...' : stats.issuesFound}</p>
-            <div className="flex items-center text-xs text-yellow-400">
-              <AlertTriangle size={12} className="mr-1" />
-              <span>Prevented deployment</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[#161b22] border border-gray-800 rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            {loading ? (
-              <p className="text-gray-400 text-center py-8">Loading activity...</p>
-            ) : (
-              recentActivity.map((activity, idx) => (
-                <div key={idx} className="flex items-start space-x-4 pb-4 border-b border-gray-800 last:border-0 hover:bg-[#0d1117]/50 p-2 rounded transition-colors -mx-2 px-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.status === 'success' ? 'bg-green-500/10 text-green-400' :
-                      activity.status === 'warning' ? 'bg-yellow-500/10 text-yellow-400' :
-                        'bg-blue-500/10 text-blue-400'
-                    }`}>
-                    {activity.type === 'review' ? <Search size={18} /> :
-                      activity.type === 'pr' ? <GitPullRequest size={18} /> :
-                        activity.type === 'issue' ? <AlertTriangle size={18} /> :
-                          <CheckCircle size={18} />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white text-sm font-medium">{activity.message}</p>
-                    <p className="text-gray-400 text-xs mt-1">{activity.repo} • {activity.time}</p>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded border ${activity.status === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                      activity.status === 'warning' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                        'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                    }`}>
-                    {activity.status}
-                  </span>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-10">
+          {/* Main Status Panel */}
+          <div className="xl:col-span-2 space-y-8">
+            <div className="bg-[#0a0c10] border border-white/5 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-white">Service Fleet Status</h2>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Activity size={12} />
+                  Live Polling
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-blue-500/20 rounded-lg p-6 hover:border-blue-500/40 transition-all group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-blue-500/10 rounded-lg group-hover:scale-110 transition-transform">
-                <Rocket size={24} className="text-blue-400" />
+              <div className="space-y-3">
+                {(status?.services || []).map((svc) => (
+                  <div
+                    key={svc.name}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4 hover:border-blue-500/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-lg ${svc.reachable ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                        <Server size={18} className={svc.reachable ? 'text-green-400' : 'text-red-400'} />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{svc.name}</p>
+                        <p className="text-xs text-gray-500 font-mono mt-0.5 max-w-[300px] truncate">
+                          {svc.url || 'Pending Configuration'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-md uppercase tracking-wider ${!svc.configured
+                            ? 'bg-gray-800 text-gray-400'
+                            : svc.reachable
+                              ? 'bg-green-900/30 text-green-400'
+                              : 'bg-red-900/30 text-red-400'
+                          }`}
+                      >
+                        {!svc.configured ? 'MISSING' : svc.reachable ? 'OPERATIONAL' : 'DOWN'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {!loading && !status?.services?.length && (
+                  <p className="text-sm text-gray-400 text-center py-8">No services registered in the fleet.</p>
+                )}
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Quick Start</h3>
-            <p className="text-gray-400 text-sm mb-4">Set up TestPilot on your first repository</p>
-            <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm transition-colors w-full font-medium">
-              Get Started
-            </button>
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <ActionCard
+                title="Install GitHub App"
+                body="Grant access to repos."
+                href={`${BACKEND_URL}/auth/install`}
+                external
+                icon={<Rocket size={20} className="text-blue-400" />}
+              />
+              <ActionCard
+                title="Repo Settings"
+                body="Configure AI rules."
+                href="/repositories"
+                icon={<Workflow size={20} className="text-green-400" />}
+              />
+              <ActionCard
+                title="View Reports"
+                body="Security insights."
+                href="/reports"
+                icon={<Shield size={20} className="text-purple-400" />}
+              />
+            </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500/5 to-teal-500/5 border border-green-500/20 rounded-lg p-6 hover:border-green-500/40 transition-all group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-green-500/10 rounded-lg group-hover:scale-110 transition-transform">
-                <Book size={24} className="text-green-400" />
+          {/* Sidebar / Info Panel */}
+          <div className="space-y-8">
+            <div className="bg-[#0a0c10] border border-white/5 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Capability Matrix</h2>
+              <div className="space-y-3">
+                {(status?.capabilities || []).map((cap) => (
+                  <div key={cap} className="flex items-center text-sm text-gray-400">
+                    <CheckCircle size={16} className="text-green-400 mr-3 flex-shrink-0" />
+                    <span>{cap}</span>
+                  </div>
+                ))}
+                {!loading && !status?.capabilities?.length && (
+                  <p className="text-sm text-gray-500 italic">No capabilities broadcasted.</p>
+                )}
               </div>
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Documentation</h3>
-            <p className="text-gray-400 text-sm mb-4">Learn how to maximize TestPilot features</p>
-            <button className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-md text-sm transition-colors w-full font-medium">
-              View Docs
-            </button>
-          </div>
 
-          <div className="bg-gradient-to-br from-orange-500/5 to-red-500/5 border border-orange-500/20 rounded-lg p-6 hover:border-orange-500/40 transition-all group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-orange-500/10 rounded-lg group-hover:scale-110 transition-transform">
-                <MessageCircle size={24} className="text-orange-400" />
+              <div className="mt-8 pt-6 border-t border-white/5">
+                <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Deployment Info</p>
+                <div className="space-y-2 text-xs text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Backend</span>
+                    <span className="text-gray-200">Render</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>AI Compute</span>
+                    <span className="text-gray-200">Local (Tunnel)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Version</span>
+                    <span className="text-gray-200">v1.2.0-ent</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span>Git Binary</span>
+                    <span className="text-gray-200 truncate max-w-[220px] text-right">
+                      {status?.runtime?.git?.path || (loading ? '...' : 'Not detected')}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Support</h3>
-            <p className="text-gray-400 text-sm mb-4">Get help from our team</p>
-            <button className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-md text-sm transition-colors w-full font-medium">
-              Contact Us
-            </button>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function MetricCard({
+  title,
+  value,
+  hint,
+  icon,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[#0a0c10] border border-white/5 rounded-2xl p-6 hover:border-blue-500/20 transition-colors">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-gray-400 text-sm font-medium">{title}</span>
+        <div className="p-2 bg-white/5 rounded-lg">{icon}</div>
+      </div>
+      <p className="text-3xl font-bold text-white mb-1 break-all">{value}</p>
+      <p className="text-xs text-gray-500">{hint}</p>
+    </div>
+  );
+}
+
+function ActionCard({
+  title,
+  body,
+  href,
+  icon,
+  external = false,
+}: {
+  title: string;
+  body: string;
+  href: string;
+  icon: React.ReactNode;
+  external?: boolean;
+}) {
+  const alignClass = "flex flex-col h-full bg-[#0a0c10] border border-white/5 rounded-2xl p-6 hover:bg-white/[0.02] hover:border-blue-500/30 transition-all cursor-pointer group";
+
+  const content = (
+    <>
+      <div className="mb-4">
+        <div className="inline-flex p-3 rounded-xl bg-white/5 group-hover:bg-blue-500/10 transition-colors">{icon}</div>
+      </div>
+      <h3 className="text-white font-semibold mb-2">{title}</h3>
+      <p className="text-sm text-gray-500 mb-4 flex-1">{body}</p>
+      <span className="text-xs font-semibold text-blue-400 flex items-center group-hover:underline">
+        {external ? 'Open External' : 'View Details'} <ExternalLink size={12} className="ml-1 opacity-50" />
+      </span>
+    </>
+  );
+
+  if (external) {
+    return <a href={href} target="_blank" rel="noopener noreferrer" className={alignClass}>{content}</a>;
+  }
+  return <Link href={href} className={alignClass}>{content}</Link>;
 }
